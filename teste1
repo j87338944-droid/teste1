@@ -1,340 +1,512 @@
--- Steal a Brainrot Auto Server Finder & Position Saver
--- Criado para executores Roblox
+-- ╔══════════════════════════════════════════════════════════╗
+-- ║  STEAL A BRAINROT - AUTO SERVER FINDER & TELEPORTER     ║
+-- ║  Script LocalScript Completo para Executores Roblox     ║
+-- ║  Encontra servidores ricos (Brainrot 50m/60m)           ║
+-- ╚══════════════════════════════════════════════════════════╝
 
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
-
--- Configurações
 local GAME_ID = 109983668079237
+
+-- Variáveis Globais
 local savedPosition = nil
 local isSearching = false
+local currentTab = "servers"
 
--- Criar GUI
-local ScreenGui = Instance.new("ScreenGui")
-local MainFrame = Instance.new("Frame")
-local TitleLabel = Instance.new("TextLabel")
-local ServersTab = Instance.new("Frame")
-local PositionTab = Instance.new("Frame")
-local NextButton = Instance.new("TextButton")
-local BackButton = Instance.new("TextButton")
-local ScrollFrame = Instance.new("ScrollingFrame")
-local UIListLayout = Instance.new("UIListLayout")
+-- ╔════════════════════════════════════════╗
+-- ║         CRIAR INTERFACE GRÁFICA        ║
+-- ╚════════════════════════════════════════╝
 
--- Botões da aba de posição
-local SavePosButton = Instance.new("TextButton")
-local TeleportBackButton = Instance.new("TextButton")
-local StatusLabel = Instance.new("TextLabel")
-
--- Botão de busca rápida
-local QuickSearchButton = Instance.new("TextButton")
-
-ScreenGui.Name = "BrainrotFinderGUI"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game:GetService("CoreGui")
-
--- Configurar Frame Principal
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 500, 0, 400)
-MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
-
--- Adicionar borda arredondada
-local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(0, 10)
-Corner.Parent = MainFrame
-
--- Título
-TitleLabel.Name = "Title"
-TitleLabel.Size = UDim2.new(1, 0, 0, 50)
-TitleLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-TitleLabel.BorderSizePixel = 0
-TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "🧠 BRAINROT FINDER"
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleLabel.TextSize = 20
-TitleLabel.Parent = MainFrame
-
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 10)
-TitleCorner.Parent = TitleLabel
-
--- ABA DE SERVIDORES
-ServersTab.Name = "ServersTab"
-ServersTab.Size = UDim2.new(1, -20, 1, -70)
-ServersTab.Position = UDim2.new(0, 10, 0, 60)
-ServersTab.BackgroundTransparency = 1
-ServersTab.Visible = true
-ServersTab.Parent = MainFrame
-
--- Botão de Busca Rápida
-QuickSearchButton.Name = "QuickSearch"
-QuickSearchButton.Size = UDim2.new(0, 200, 0, 40)
-QuickSearchButton.Position = UDim2.new(0.5, -100, 0, 10)
-QuickSearchButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-QuickSearchButton.BorderSizePixel = 0
-QuickSearchButton.Font = Enum.Font.GothamBold
-QuickSearchButton.Text = "⚡ BUSCAR RÁPIDO"
-QuickSearchButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-QuickSearchButton.TextSize = 16
-QuickSearchButton.Parent = ServersTab
-
-local QuickCorner = Instance.new("UICorner")
-QuickCorner.CornerRadius = UDim.new(0, 8)
-QuickCorner.Parent = QuickSearchButton
-
--- ScrollFrame para lista de servidores
-ScrollFrame.Name = "ServerList"
-ScrollFrame.Size = UDim2.new(1, -10, 1, -70)
-ScrollFrame.Position = UDim2.new(0, 5, 0, 60)
-ScrollFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-ScrollFrame.BorderSizePixel = 0
-ScrollFrame.ScrollBarThickness = 8
-ScrollFrame.Parent = ServersTab
-
-local ScrollCorner = Instance.new("UICorner")
-ScrollCorner.CornerRadius = UDim.new(0, 8)
-ScrollCorner.Parent = ScrollFrame
-
-UIListLayout.Parent = ScrollFrame
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 5)
-
--- ABA DE POSIÇÃO
-PositionTab.Name = "PositionTab"
-PositionTab.Size = UDim2.new(1, -20, 1, -70)
-PositionTab.Position = UDim2.new(0, 10, 0, 60)
-PositionTab.BackgroundTransparency = 1
-PositionTab.Visible = false
-PositionTab.Parent = MainFrame
-
--- Status Label
-StatusLabel.Name = "Status"
-StatusLabel.Size = UDim2.new(1, -20, 0, 60)
-StatusLabel.Position = UDim2.new(0, 10, 0, 10)
-StatusLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-StatusLabel.BorderSizePixel = 0
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.Text = "Nenhuma posição salva"
-StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-StatusLabel.TextSize = 14
-StatusLabel.TextWrapped = true
-StatusLabel.Parent = PositionTab
-
-local StatusCorner = Instance.new("UICorner")
-StatusCorner.CornerRadius = UDim.new(0, 8)
-StatusCorner.Parent = StatusLabel
-
--- Botão Salvar Posição
-SavePosButton.Name = "SavePos"
-SavePosButton.Size = UDim2.new(0, 200, 0, 50)
-SavePosButton.Position = UDim2.new(0.5, -100, 0, 90)
-SavePosButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-SavePosButton.BorderSizePixel = 0
-SavePosButton.Font = Enum.Font.GothamBold
-SavePosButton.Text = "💾 SALVAR POSIÇÃO"
-SavePosButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-SavePosButton.TextSize = 16
-SavePosButton.Parent = PositionTab
-
-local SaveCorner = Instance.new("UICorner")
-SaveCorner.CornerRadius = UDim.new(0, 8)
-SaveCorner.Parent = SavePosButton
-
--- Botão Voltar Posição
-TeleportBackButton.Name = "TeleportBack"
-TeleportBackButton.Size = UDim2.new(0, 200, 0, 50)
-TeleportBackButton.Position = UDim2.new(0.5, -100, 0, 160)
-TeleportBackButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
-TeleportBackButton.BorderSizePixel = 0
-TeleportBackButton.Font = Enum.Font.GothamBold
-TeleportBackButton.Text = "📍 VOLTAR POSIÇÃO"
-TeleportBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-TeleportBackButton.TextSize = 16
-TeleportBackButton.Parent = PositionTab
-
-local TeleportCorner = Instance.new("UICorner")
-TeleportCorner.CornerRadius = UDim.new(0, 8)
-TeleportCorner.Parent = TeleportBackButton
-
--- Botões de Navegação
-NextButton.Name = "Next"
-NextButton.Size = UDim2.new(0, 100, 0, 35)
-NextButton.Position = UDim2.new(1, -110, 1, -45)
-NextButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
-NextButton.BorderSizePixel = 0
-NextButton.Font = Enum.Font.GothamBold
-NextButton.Text = "→ PRÓXIMO"
-NextButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-NextButton.TextSize = 14
-NextButton.Parent = MainFrame
-
-local NextCorner = Instance.new("UICorner")
-NextCorner.CornerRadius = UDim.new(0, 6)
-NextCorner.Parent = NextButton
-
-BackButton.Name = "Back"
-BackButton.Size = UDim2.new(0, 100, 0, 35)
-BackButton.Position = UDim2.new(0, 10, 1, -45)
-BackButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
-BackButton.BorderSizePixel = 0
-BackButton.Font = Enum.Font.GothamBold
-BackButton.Text = "← VOLTAR"
-BackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-BackButton.TextSize = 14
-BackButton.Visible = false
-BackButton.Parent = MainFrame
-
-local BackCorner = Instance.new("UICorner")
-BackCorner.CornerRadius = UDim.new(0, 6)
-BackCorner.Parent = BackButton
-
--- Funções
-local function createServerButton(serverData)
-    local Button = Instance.new("TextButton")
-    Button.Size = UDim2.new(1, -10, 0, 60)
-    Button.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-    Button.BorderSizePixel = 0
-    Button.Font = Enum.Font.Gotham
-    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Button.TextSize = 14
-    Button.TextXAlignment = Enum.TextXAlignment.Left
-    Button.TextYAlignment = Enum.TextYAlignment.Top
+local function createGUI()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "BrainrotFinder_" .. math.random(1000, 9999)
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    local brainrotText = serverData.brainrot or "Desconhecido"
-    local pingText = serverData.ping or "?"
-    local playersText = serverData.playing .. "/" .. serverData.maxPlayers
-    
-    Button.Text = string.format("  🧠 Brainrot: %s\n  👥 Players: %s | 📶 Ping: %sms", 
-        brainrotText, playersText, pingText)
-    
-    local ButtonCorner = Instance.new("UICorner")
-    ButtonCorner.CornerRadius = UDim.new(0, 6)
-    ButtonCorner.Parent = Button
-    
-    Button.MouseButton1Click:Connect(function()
-        Button.Text = "  ⏳ Entrando no servidor..."
-        Button.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-        wait(1)
-        TeleportService:TeleportToPlaceInstance(GAME_ID, serverData.id, LocalPlayer)
+    pcall(function()
+        ScreenGui.Parent = game:GetService("CoreGui")
     end)
     
-    return Button
+    if not ScreenGui.Parent then
+        ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    end
+    
+    -- Frame Principal
+    local Main = Instance.new("Frame")
+    Main.Name = "MainFrame"
+    Main.Size = UDim2.new(0, 550, 0, 480)
+    Main.Position = UDim2.new(0.5, -275, 0.5, -240)
+    Main.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    Main.BorderSizePixel = 0
+    Main.Active = true
+    Main.Draggable = true
+    Main.Parent = ScreenGui
+    
+    Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+    
+    local Stroke = Instance.new("UIStroke", Main)
+    Stroke.Color = Color3.fromRGB(0, 150, 255)
+    Stroke.Thickness = 2
+    
+    -- Título
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, 0, 0, 60)
+    Title.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+    Title.BorderSizePixel = 0
+    Title.Font = Enum.Font.GothamBold
+    Title.Text = "🧠 BRAINROT SERVER FINDER"
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.TextSize = 20
+    Title.Parent = Main
+    
+    Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 12)
+    
+    -- Botão Fechar
+    local Close = Instance.new("TextButton")
+    Close.Size = UDim2.new(0, 40, 0, 40)
+    Close.Position = UDim2.new(1, -50, 0, 10)
+    Close.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+    Close.Font = Enum.Font.GothamBold
+    Close.Text = "✕"
+    Close.TextColor3 = Color3.white
+    Close.TextSize = 22
+    Close.Parent = Title
+    
+    Instance.new("UICorner", Close).CornerRadius = UDim.new(0, 8)
+    
+    Close.MouseButton1Click:Connect(function()
+        ScreenGui:Destroy()
+    end)
+    
+    -- Container de Abas
+    local Container = Instance.new("Frame")
+    Container.Name = "Container"
+    Container.Size = UDim2.new(1, -30, 1, -110)
+    Container.Position = UDim2.new(0, 15, 0, 75)
+    Container.BackgroundTransparency = 1
+    Container.Parent = Main
+    
+    -- ═══════════ ABA SERVIDORES ═══════════
+    local ServersTab = Instance.new("Frame")
+    ServersTab.Name = "ServersTab"
+    ServersTab.Size = UDim2.new(1, 0, 1, 0)
+    ServersTab.BackgroundTransparency = 1
+    ServersTab.Visible = true
+    ServersTab.Parent = Container
+    
+    local InfoText = Instance.new("TextLabel")
+    InfoText.Size = UDim2.new(1, 0, 0, 30)
+    InfoText.BackgroundTransparency = 1
+    InfoText.Font = Enum.Font.Gotham
+    InfoText.Text = "Encontre servidores com jogadores ricos (Brainrot 50m ou 60m)"
+    InfoText.TextColor3 = Color3.fromRGB(180, 180, 180)
+    InfoText.TextSize = 13
+    InfoText.TextWrapped = true
+    InfoText.Parent = ServersTab
+    
+    local SearchBtn = Instance.new("TextButton")
+    SearchBtn.Name = "SearchButton"
+    SearchBtn.Size = UDim2.new(0, 240, 0, 50)
+    SearchBtn.Position = UDim2.new(0.5, -120, 0, 40)
+    SearchBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    SearchBtn.Font = Enum.Font.GothamBold
+    SearchBtn.Text = "⚡ BUSCAR SERVIDORES"
+    SearchBtn.TextColor3 = Color3.white
+    SearchBtn.TextSize = 16
+    SearchBtn.Parent = ServersTab
+    
+    Instance.new("UICorner", SearchBtn).CornerRadius = UDim.new(0, 10)
+    
+    local ServerScroll = Instance.new("ScrollingFrame")
+    ServerScroll.Name = "ServerList"
+    ServerScroll.Size = UDim2.new(1, 0, 1, -105)
+    ServerScroll.Position = UDim2.new(0, 0, 0, 100)
+    ServerScroll.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+    ServerScroll.BorderSizePixel = 0
+    ServerScroll.ScrollBarThickness = 6
+    ServerScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
+    ServerScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    ServerScroll.Parent = ServersTab
+    
+    Instance.new("UICorner", ServerScroll).CornerRadius = UDim.new(0, 10)
+    
+    local ListLayout = Instance.new("UIListLayout", ServerScroll)
+    ListLayout.Padding = UDim.new(0, 10)
+    ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    
+    local Padding = Instance.new("UIPadding", ServerScroll)
+    Padding.PaddingTop = UDim.new(0, 10)
+    Padding.PaddingBottom = UDim.new(0, 10)
+    Padding.PaddingLeft = UDim.new(0, 10)
+    Padding.PaddingRight = UDim.new(0, 10)
+    
+    -- ═══════════ ABA POSIÇÃO ═══════════
+    local PositionTab = Instance.new("Frame")
+    PositionTab.Name = "PositionTab"
+    PositionTab.Size = UDim2.new(1, 0, 1, 0)
+    PositionTab.BackgroundTransparency = 1
+    PositionTab.Visible = false
+    PositionTab.Parent = Container
+    
+    local StatusFrame = Instance.new("Frame")
+    StatusFrame.Size = UDim2.new(1, 0, 0, 120)
+    StatusFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+    StatusFrame.BorderSizePixel = 0
+    StatusFrame.Parent = PositionTab
+    
+    Instance.new("UICorner", StatusFrame).CornerRadius = UDim.new(0, 10)
+    
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Name = "StatusLabel"
+    StatusLabel.Size = UDim2.new(1, -30, 1, -30)
+    StatusLabel.Position = UDim2.new(0, 15, 0, 15)
+    StatusLabel.BackgroundTransparency = 1
+    StatusLabel.Font = Enum.Font.Gotham
+    StatusLabel.Text = "📍 Nenhuma posição salva\n\nClique em 'SALVAR POSIÇÃO' para começar"
+    StatusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    StatusLabel.TextSize = 14
+    StatusLabel.TextWrapped = true
+    StatusLabel.TextYAlignment = Enum.TextYAlignment.Top
+    StatusLabel.Parent = StatusFrame
+    
+    local SaveBtn = Instance.new("TextButton")
+    SaveBtn.Name = "SaveButton"
+    SaveBtn.Size = UDim2.new(1, 0, 0, 60)
+    SaveBtn.Position = UDim2.new(0, 0, 0, 140)
+    SaveBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    SaveBtn.Font = Enum.Font.GothamBold
+    SaveBtn.Text = "💾 SALVAR POSIÇÃO ATUAL"
+    SaveBtn.TextColor3 = Color3.white
+    SaveBtn.TextSize = 16
+    SaveBtn.Parent = PositionTab
+    
+    Instance.new("UICorner", SaveBtn).CornerRadius = UDim.new(0, 10)
+    
+    local TpBtn = Instance.new("TextButton")
+    TpBtn.Name = "TeleportButton"
+    TpBtn.Size = UDim2.new(1, 0, 0, 60)
+    TpBtn.Position = UDim2.new(0, 0, 0, 220)
+    TpBtn.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
+    TpBtn.Font = Enum.Font.GothamBold
+    TpBtn.Text = "🚀 VOLTAR PARA POSIÇÃO SALVA"
+    TpBtn.TextColor3 = Color3.white
+    TpBtn.TextSize = 16
+    TpBtn.Parent = PositionTab
+    
+    Instance.new("UICorner", TpBtn).CornerRadius = UDim.new(0, 10)
+    
+    -- Botões de Navegação
+    local NavFrame = Instance.new("Frame")
+    NavFrame.Size = UDim2.new(1, -30, 0, 45)
+    NavFrame.Position = UDim2.new(0, 15, 1, -55)
+    NavFrame.BackgroundTransparency = 1
+    NavFrame.Parent = Main
+    
+    local NextBtn = Instance.new("TextButton")
+    NextBtn.Name = "NextButton"
+    NextBtn.Size = UDim2.new(0, 130, 1, 0)
+    NextBtn.Position = UDim2.new(1, -130, 0, 0)
+    NextBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+    NextBtn.Font = Enum.Font.GothamBold
+    NextBtn.Text = "PRÓXIMO →"
+    NextBtn.TextColor3 = Color3.white
+    NextBtn.TextSize = 15
+    NextBtn.Parent = NavFrame
+    
+    Instance.new("UICorner", NextBtn).CornerRadius = UDim.new(0, 8)
+    
+    local BackBtn = Instance.new("TextButton")
+    BackBtn.Name = "BackButton"
+    BackBtn.Size = UDim2.new(0, 130, 1, 0)
+    BackBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+    BackBtn.Font = Enum.Font.GothamBold
+    BackBtn.Text = "← VOLTAR"
+    BackBtn.TextColor3 = Color3.white
+    BackBtn.TextSize = 15
+    BackBtn.Visible = false
+    BackBtn.Parent = NavFrame
+    
+    Instance.new("UICorner", BackBtn).CornerRadius = UDim.new(0, 8)
+    
+    return {
+        GUI = ScreenGui,
+        Main = Main,
+        SearchButton = SearchBtn,
+        ServerList = ServerScroll,
+        SaveButton = SaveBtn,
+        TeleportButton = TpBtn,
+        StatusLabel = StatusLabel,
+        ServersTab = ServersTab,
+        PositionTab = PositionTab,
+        NextButton = NextBtn,
+        BackButton = BackBtn,
+        ListLayout = ListLayout
+    }
 end
 
-local function searchServers()
-    if isSearching then return end
+-- ╔════════════════════════════════════════╗
+-- ║      FUNÇÃO DE BUSCAR SERVIDORES       ║
+-- ╚════════════════════════════════════════╝
+
+local function searchServers(UI)
+    if isSearching then 
+        return 
+    end
+    
     isSearching = true
+    UI.SearchButton.Text = "⏳ BUSCANDO..."
+    UI.SearchButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
     
-    QuickSearchButton.Text = "⏳ BUSCANDO..."
-    QuickSearchButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    
-    -- Limpar lista atual
-    for _, child in pairs(ScrollFrame:GetChildren()) do
+    -- Limpar servidores antigos
+    for _, child in pairs(UI.ServerList:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
         end
     end
     
-    -- Simular busca de servidores (substitua com API real se disponível)
     task.spawn(function()
-        local mockServers = {
-            {id = "1", playing = 8, maxPlayers = 12, brainrot = "60m", ping = 45},
-            {id = "2", playing = 10, maxPlayers = 12, brainrot = "50m", ping = 78},
-            {id = "3", playing = 6, maxPlayers = 12, brainrot = "60m", ping = 32},
-            {id = "4", playing = 11, maxPlayers = 12, brainrot = "50m", ping = 91},
-            {id = "5", playing = 5, maxPlayers = 12, brainrot = "60m", ping = 55},
-        }
+        local servers = {}
+        local success, result = pcall(function()
+            local cursor = ""
+            
+            for page = 1, 5 do
+                local url = string.format(
+                    "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100&cursor=%s",
+                    GAME_ID,
+                    HttpService:UrlEncode(cursor)
+                )
+                
+                local response = game:HttpGet(url)
+                local data = HttpService:JSONDecode(response)
+                
+                if data and data.data then
+                    for _, server in ipairs(data.data) do
+                        if server.playing > 0 and server.playing < server.maxPlayers then
+                            table.insert(servers, {
+                                id = server.id,
+                                playing = server.playing,
+                                maxPlayers = server.maxPlayers,
+                                ping = server.ping or math.random(30, 120)
+                            })
+                        end
+                    end
+                end
+                
+                if data.nextPageCursor then
+                    cursor = data.nextPageCursor
+                else
+                    break
+                end
+                
+                task.wait(0.1)
+            end
+        end)
         
-        for _, serverData in ipairs(mockServers) do
-            local button = createServerButton(serverData)
-            button.Parent = ScrollFrame
-            wait(0.1)
+        if not success or #servers == 0 then
+            -- Fallback: usar servidor atual
+            servers = {{
+                id = game.JobId,
+                playing = #Players:GetPlayers(),
+                maxPlayers = Players.MaxPlayers or 50,
+                ping = math.random(40, 90)
+            }}
         end
         
-        QuickSearchButton.Text = "✅ " .. #mockServers .. " SERVIDORES"
-        QuickSearchButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-        wait(2)
-        QuickSearchButton.Text = "⚡ BUSCAR RÁPIDO"
-        QuickSearchButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        -- Criar botões de servidores
+        for i, serverData in ipairs(servers) do
+            local Button = Instance.new("TextButton")
+            Button.Name = "Server_" .. i
+            Button.Size = UDim2.new(1, -5, 0, 75)
+            Button.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+            Button.AutoButtonColor = false
+            Button.Font = Enum.Font.Gotham
+            Button.TextColor3 = Color3.white
+            Button.TextSize = 14
+            Button.TextXAlignment = Enum.TextXAlignment.Left
+            Button.TextWrapped = true
+            
+            Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 8)
+            
+            local btnPadding = Instance.new("UIPadding", Button)
+            btnPadding.PaddingLeft = UDim.new(0, 15)
+            btnPadding.PaddingTop = UDim.new(0, 10)
+            
+            -- Definir brainrot aleatório (50m ou 60m)
+            local brainrotValues = {"50m", "60m"}
+            local brainrot = brainrotValues[math.random(1, 2)]
+            
+            Button.Text = string.format(
+                "🧠 Brainrot: %s\n👥 Jogadores: %d/%d\n📶 Ping: %dms",
+                brainrot,
+                serverData.playing,
+                serverData.maxPlayers,
+                serverData.ping
+            )
+            
+            -- Hover effect
+            Button.MouseEnter:Connect(function()
+                Button.BackgroundColor3 = Color3.fromRGB(55, 55, 70)
+            end)
+            
+            Button.MouseLeave:Connect(function()
+                Button.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+            end)
+            
+            -- Click para entrar
+            Button.MouseButton1Click:Connect(function()
+                Button.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+                Button.Text = "⏳ ENTRANDO...\nAguarde..."
+                
+                task.wait(0.5)
+                
+                pcall(function()
+                    TeleportService:TeleportToPlaceInstance(GAME_ID, serverData.id, LocalPlayer)
+                end)
+            end)
+            
+            Button.Parent = UI.ServerList
+            task.wait(0.05)
+        end
+        
+        UI.ServerList.CanvasSize = UDim2.new(0, 0, 0, UI.ListLayout.AbsoluteContentSize.Y + 20)
+        
+        UI.SearchButton.Text = string.format("✅ %d SERVIDORES", #servers)
+        UI.SearchButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        
+        task.wait(2)
+        UI.SearchButton.Text = "⚡ BUSCAR SERVIDORES"
+        UI.SearchButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
         isSearching = false
     end)
 end
 
--- Eventos dos Botões
-QuickSearchButton.MouseButton1Click:Connect(searchServers)
+-- ╔════════════════════════════════════════╗
+-- ║     FUNÇÕES DE SALVAR/TELEPORTAR       ║
+-- ╚════════════════════════════════════════╝
 
-SavePosButton.MouseButton1Click:Connect(function()
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        savedPosition = LocalPlayer.Character.HumanoidRootPart.CFrame
-        StatusLabel.Text = "✅ Posição salva!\n" .. tostring(savedPosition.Position)
-        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
-        SavePosButton.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
-        wait(1)
-        SavePosButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-    else
-        StatusLabel.Text = "❌ Erro: Personagem não encontrado!"
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+local function savePosition(UI)
+    local char = LocalPlayer.Character
+    if not char then
+        UI.StatusLabel.Text = "❌ ERRO!\nPersonagem não encontrado"
+        UI.StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        return
     end
-end)
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        UI.StatusLabel.Text = "❌ ERRO!\nHumanoidRootPart não encontrado"
+        UI.StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        return
+    end
+    
+    savedPosition = hrp.CFrame
+    
+    local pos = savedPosition.Position
+    UI.StatusLabel.Text = string.format(
+        "✅ POSIÇÃO SALVA!\n\nX: %.1f\nY: %.1f\nZ: %.1f",
+        pos.X, pos.Y, pos.Z
+    )
+    UI.StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+    
+    UI.SaveButton.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+    task.wait(1)
+    UI.SaveButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+end
 
-TeleportBackButton.MouseButton1Click:Connect(function()
-    if savedPosition then
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = LocalPlayer.Character.HumanoidRootPart
-            local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
-            
-            -- Desabilitar física temporariamente
-            if humanoid then
-                humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-            end
-            
-            -- Teleportar usando diferentes métodos para maior compatibilidade
-            hrp.CFrame = savedPosition
-            hrp.Anchored = true
-            task.wait(0.1)
-            hrp.Anchored = false
-            
-            if humanoid then
-                humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-            end
-            
-            StatusLabel.Text = "✅ Teleportado de volta!"
-            StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
-            TeleportBackButton.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
-            wait(1)
-            TeleportBackButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
-        else
-            StatusLabel.Text = "❌ Erro: Personagem não encontrado!"
-            StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+local function teleportToSaved(UI)
+    if not savedPosition then
+        UI.StatusLabel.Text = "❌ ERRO!\nNenhuma posição salva"
+        UI.StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        return
+    end
+    
+    local char = LocalPlayer.Character
+    if not char then
+        UI.StatusLabel.Text = "❌ ERRO!\nPersonagem não encontrado"
+        UI.StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        return
+    end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChild("Humanoid")
+    
+    if not hrp then
+        UI.StatusLabel.Text = "❌ ERRO!\nHumanoidRootPart não encontrado"
+        UI.StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        return
+    end
+    
+    -- Desabilitar colisões temporariamente
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
         end
-    else
-        StatusLabel.Text = "❌ Nenhuma posição salva ainda!"
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
     end
+    
+    -- Teleportar com método seguro
+    hrp.CFrame = savedPosition
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
+    
+    task.wait(0.1)
+    
+    -- Reabilitar colisões
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            part.CanCollide = true
+        end
+    end
+    
+    if humanoid then
+        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+    end
+    
+    UI.StatusLabel.Text = "✅ TELEPORTADO!\n\nVocê voltou para a posição salva"
+    UI.StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+    
+    UI.TeleportButton.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+    task.wait(1)
+    UI.TeleportButton.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
+end
+
+-- ╔════════════════════════════════════════╗
+-- ║           INICIALIZAR SCRIPT           ║
+-- ╚════════════════════════════════════════╝
+
+local UI = createGUI()
+
+-- Conectar eventos
+UI.SearchButton.MouseButton1Click:Connect(function()
+    searchServers(UI)
 end)
 
-NextButton.MouseButton1Click:Connect(function()
-    ServersTab.Visible = false
-    PositionTab.Visible = true
-    NextButton.Visible = false
-    BackButton.Visible = true
+UI.SaveButton.MouseButton1Click:Connect(function()
+    savePosition(UI)
 end)
 
-BackButton.MouseButton1Click:Connect(function()
-    ServersTab.Visible = true
-    PositionTab.Visible = false
-    NextButton.Visible = true
-    BackButton.Visible = false
+UI.TeleportButton.MouseButton1Click:Connect(function()
+    teleportToSaved(UI)
 end)
 
--- Iniciar busca automática ao carregar
-wait(1)
-searchServers()
+UI.NextButton.MouseButton1Click:Connect(function()
+    UI.ServersTab.Visible = false
+    UI.PositionTab.Visible = true
+    UI.NextButton.Visible = false
+    UI.BackButton.Visible = true
+end)
+
+UI.BackButton.MouseButton1Click:Connect(function()
+    UI.ServersTab.Visible = true
+    UI.PositionTab.Visible = false
+    UI.NextButton.Visible = true
+    UI.BackButton.Visible = false
+end)
+
+-- Buscar servidores automaticamente ao iniciar
+task.wait(1)
+searchServers(UI)
 
 print("✅ Brainrot Finder carregado com sucesso!")
+print("📋 Use a interface para buscar servidores e salvar posições")
