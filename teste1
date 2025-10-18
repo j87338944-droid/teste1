@@ -1,166 +1,364 @@
--- LocalScript para StarterGui
+--[[
+    ROBLOX | Steal a Brainrot | Finder & Position Saver
+    Script Local LUA para Executor DELTA (ou outros exploits)
+    Game: https://www.roblox.com/pt/games/109983668079237/Steal-a-Brainrot
+    Autor: j87338944-droid
+    Data: 2025-10-18 19:54:28
+--]]
 
+------------------------[ Serviços e Variáveis Globais ]------------------------
 local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local player = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+
+local PLAYER = LocalPlayer
+local PLACE_ID = 109983668079237
 local savedPosition = nil
+local foundServers = {}
+local serversPerPage = 7
+local currentPage = 1
+local searchingServers = false
+local teleporting = false
+local ScreenGui, MainFrame, ServerFrame, PosFrame
+local ServerListScrollingFrame
+local NextTabArrow, PrevTabArrow
+local SavePosButton, BackButton, FastSearchButton, EnterButton
+local currentTab = 1
+local selectedServerIndex = 1
+local minPlayers = 50
 
--- IDs e configs
-local PLACE_ID = 109983668079237 -- Steal a Brainrot
-local BRAINROT_MIN = 50000000 -- 50m
-local BRAINROT_MAX = 60000000 -- 60m
+------------------------[ Funções Utilitárias ]------------------------
+local function round(n, dec)
+    local m = 10^(dec or 0)
+    return math.floor(n * m + 0.5) / m
+end
 
--- Função que busca servidores filtrando brainrots
-local function buscarServidores()
-    local servers = {}
-    local try = pcall(function()
-        local url = ("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100"):format(PLACE_ID)
-        local response = HttpService:GetAsync(url)
-        local data = HttpService:JSONDecode(response)
-        for _, server in ipairs(data.data) do
-            if server.playerCount < server.maxPlayers then
-                -- Supondo que a quantidade de brainrots é armazenada em server.attributes.brainrots
-                local brainrots = server.attributes and server.attributes.brainrots or 0
-                if brainrots >= BRAINROT_MIN and brainrots <= BRAINROT_MAX then
-                    table.insert(servers, {
-                        id = server.id,
-                        brainrots = brainrots,
-                        playerCount = server.playerCount,
-                        maxPlayers = server.maxPlayers
-                    })
+local function safeCall(func, ...)
+    local ok, result = pcall(func, ...)
+    if ok then
+        return result
+    end
+    return nil
+end
+
+local function getPlayerRoot()
+    return PLAYER.Character and PLAYER.Character:FindFirstChild("HumanoidRootPart")
+end
+
+local function copyVector3(vec)
+    return Vector3.new(vec.X, vec.Y, vec.Z)
+end
+
+local function lerp(a, b, t)
+    return a + (b - a) * t
+end
+
+local function waitForCharacter()
+    while not PLAYER.Character or not PLAYER.Character:FindFirstChild("HumanoidRootPart") do
+        wait(0.1)
+    end
+    return PLAYER.Character
+end
+
+------------------------[ Busca de Servidores ]------------------------
+local function fetchServersAsync(brainrotMin)
+    searchingServers = true
+    foundServers = {}
+    local cursor = ""
+    local maxPages = 20
+    local pages = 0
+    while searchingServers and pages < maxPages do
+        pages = pages + 1
+        local url = ("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100%s"):format(
+            PLACE_ID, cursor ~= "" and ("&cursor=" .. cursor) or ""
+        )
+        local content = safeCall(function() return game:HttpGet(url) end)
+        if content then
+            local data = safeCall(function() return HttpService:JSONDecode(content) end)
+            if data and data.data then
+                for _, server in ipairs(data.data) do
+                    if not searchingServers then break end
+                    local playerCount = server.playing or 0
+                    if playerCount >= brainrotMin then
+                        table.insert(foundServers, server)
+                    end
                 end
+                cursor = data.nextPageCursor or ""
+                if cursor == "" or not cursor then break end
+            else
+                break
             end
+        else
+            break
         end
-    end)
-    return servers
+        wait(0.2)
+    end
+    searchingServers = false
 end
 
--- Função para teleportar para um servidor específico
-local function teleportarParaServidor(serverId)
-    TeleportService:TeleportToPlaceInstance(PLACE_ID, serverId, player)
+------------------------[ Interface Gráfica ]------------------------
+local function createUI()
+    if PLAYER.PlayerGui:FindFirstChild("BrainrotFinderSGUI") then
+        PLAYER.PlayerGui.BrainrotFinderSGUI:Destroy()
+    end
+
+    ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "BrainrotFinderSGUI"
+    ScreenGui.Parent = PLAYER.PlayerGui
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    MainFrame = Instance.new("Frame")
+    MainFrame.Size = UDim2.new(0, 550, 0, 440)
+    MainFrame.Position = UDim2.new(0.5, -275, 0.5, -220)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(35, 36, 38)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Parent = ScreenGui
+
+    local UICorner = Instance.new("UICorner", MainFrame)
+    UICorner.CornerRadius = UDim.new(0, 12)
+
+    local TopBar = Instance.new("Frame", MainFrame)
+    TopBar.Size = UDim2.new(1, 0, 0, 40)
+    TopBar.BackgroundColor3 = Color3.fromRGB(25, 25, 27)
+    TopBar.BorderSizePixel = 0
+
+    local Title = Instance.new("TextLabel", TopBar)
+    Title.Size = UDim2.new(1, 0, 1, 0)
+    Title.BackgroundTransparency = 1
+    Title.Text = "Brainrot Server Finder"
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 22
+    Title.TextColor3 = Color3.new(1, 1, 1)
+
+    ServerFrame = Instance.new("Frame", MainFrame)
+    ServerFrame.Size = UDim2.new(1, 0, 1, -40)
+    ServerFrame.Position = UDim2.new(0, 0, 0, 40)
+    ServerFrame.BackgroundTransparency = 1
+
+    PosFrame = Instance.new("Frame", MainFrame)
+    PosFrame.Size = UDim2.new(1, 0, 1, -40)
+    PosFrame.Position = UDim2.new(0, 0, 0, 40)
+    PosFrame.BackgroundTransparency = 1
+    PosFrame.Visible = false
+
+    NextTabArrow = Instance.new("TextButton", MainFrame)
+    NextTabArrow.Size = UDim2.new(0, 40, 0, 40)
+    NextTabArrow.Position = UDim2.new(1, -45, 1, -45)
+    NextTabArrow.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    NextTabArrow.Text = "→"
+    NextTabArrow.Font = Enum.Font.SourceSansBold
+    NextTabArrow.TextSize = 30
+    NextTabArrow.TextColor3 = Color3.new(1, 1, 1)
+
+    PrevTabArrow = Instance.new("TextButton", MainFrame)
+    PrevTabArrow.Size = UDim2.new(0, 40, 0, 40)
+    PrevTabArrow.Position = UDim2.new(0, 5, 1, -45)
+    PrevTabArrow.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    PrevTabArrow.Text = "←"
+    PrevTabArrow.Font = Enum.Font.SourceSansBold
+    PrevTabArrow.TextSize = 30
+    PrevTabArrow.TextColor3 = Color3.new(1, 1, 1)
+    PrevTabArrow.Visible = false
+
+    ServerListScrollingFrame = Instance.new("ScrollingFrame", ServerFrame)
+    ServerListScrollingFrame.Size = UDim2.new(1, -20, 1, -120)
+    ServerListScrollingFrame.Position = UDim2.new(0, 10, 0, 10)
+    ServerListScrollingFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+    ServerListScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    ServerListScrollingFrame.ScrollBarThickness = 8
+    ServerListScrollingFrame.BorderSizePixel = 0
+
+    local UIListLayout = Instance.new("UIListLayout", ServerListScrollingFrame)
+    UIListLayout.Padding = UDim.new(0, 7)
+    UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+    FastSearchButton = Instance.new("TextButton", ServerFrame)
+    FastSearchButton.Size = UDim2.new(0, 190, 0, 40)
+    FastSearchButton.Position = UDim2.new(0, 10, 1, -50)
+    FastSearchButton.BackgroundColor3 = Color3.fromRGB(80, 160, 90)
+    FastSearchButton.Text = "Buscar Rápido"
+    FastSearchButton.Font = Enum.Font.GothamBold
+    FastSearchButton.TextSize = 18
+    FastSearchButton.TextColor3 = Color3.new(1, 1, 1)
+
+    EnterButton = Instance.new("TextButton", ServerFrame)
+    EnterButton.Size = UDim2.new(0, 190, 0, 40)
+    EnterButton.Position = UDim2.new(1, -200, 1, -50)
+    EnterButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
+    EnterButton.Text = "Entrar"
+    EnterButton.Font = Enum.Font.GothamBold
+    EnterButton.TextSize = 18
+    EnterButton.TextColor3 = Color3.new(1, 1, 1)
+
+    SavePosButton = Instance.new("TextButton", PosFrame)
+    SavePosButton.Size = UDim2.new(0, 180, 0, 40)
+    SavePosButton.Position = UDim2.new(0.5, -200, 0.5, -20)
+    SavePosButton.BackgroundColor3 = Color3.fromRGB(120, 180, 80)
+    SavePosButton.Text = "Salvar Posição"
+    SavePosButton.Font = Enum.Font.GothamBold
+    SavePosButton.TextSize = 18
+    SavePosButton.TextColor3 = Color3.new(1, 1, 1)
+
+    BackButton = Instance.new("TextButton", PosFrame)
+    BackButton.Size = UDim2.new(0, 180, 0, 40)
+    BackButton.Position = UDim2.new(0.5, 20, 0.5, -20)
+    BackButton.BackgroundColor3 = Color3.fromRGB(180, 80, 80)
+    BackButton.Text = "Voltar"
+    BackButton.Font = Enum.Font.GothamBold
+    BackButton.TextSize = 18
+    BackButton.TextColor3 = Color3.new(1, 1, 1)
 end
 
--- GUI Setup
-local screenGui = Instance.new("ScreenGui", player.PlayerGui)
-screenGui.Name = "BrainrotGui"
+------------------------[ Funções de Controle ]------------------------
+local function showTab(tabIndex)
+    currentTab = tabIndex
+    ServerFrame.Visible = (tabIndex == 1)
+    NextTabArrow.Visible = (tabIndex == 1)
+    PrevTabArrow.Visible = (tabIndex == 2)
+    PosFrame.Visible = (tabIndex == 2)
+end
 
-local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 500, 0, 350)
-frame.Position = UDim2.new(0.5, -250, 0.5, -175)
-frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+local function updateServerList()
+    ServerListScrollingFrame:ClearAllChildren()
+    local UIListLayout = Instance.new("UIListLayout", ServerListScrollingFrame)
+    UIListLayout.Padding = UDim.new(0, 7)
+    UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-local abaServidores = Instance.new("Frame", frame)
-abaServidores.Size = UDim2.new(1, 0, 1, 0)
-abaServidores.BackgroundTransparency = 1
+    local startIdx = (currentPage - 1) * serversPerPage + 1
+    local endIdx = math.min(startIdx + serversPerPage - 1, #foundServers)
 
-local abaPosicao = Instance.new("Frame", frame)
-abaPosicao.Size = UDim2.new(1, 0, 1, 0)
-abaPosicao.Visible = false
-abaPosicao.BackgroundTransparency = 1
+    for i = startIdx, endIdx do
+        local server = foundServers[i]
+        local serverButton = Instance.new("TextButton")
+        serverButton.Size = UDim2.new(1, -10, 0, 48)
+        serverButton.BackgroundColor3 = Color3.fromRGB(70, 70, 85)
+        serverButton.Text = ("Servidor: %s | Jogadores: %d/%d"):format(
+            server.id, server.playing or 0, server.maxPlayers or 0
+        )
+        serverButton.Font = Enum.Font.Gotham
+        serverButton.TextSize = 16
+        serverButton.TextColor3 = Color3.new(1, 1, 1)
+        serverButton.Parent = ServerListScrollingFrame
 
--- Seta para próxima aba
-local setaProxima = Instance.new("TextButton", abaServidores)
-setaProxima.Size = UDim2.new(0, 30, 0, 30)
-setaProxima.Position = UDim2.new(1, -40, 1, -40)
-setaProxima.Text = "→"
-setaProxima.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-setaProxima.MouseButton1Click:Connect(function()
-    abaServidores.Visible = false
-    abaPosicao.Visible = true
-end)
-
--- Seta para voltar
-local setaVoltar = Instance.new("TextButton", abaPosicao)
-setaVoltar.Size = UDim2.new(0, 30, 0, 30)
-setaVoltar.Position = UDim2.new(0, 10, 1, -40)
-setaVoltar.Text = "←"
-setaVoltar.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-setaVoltar.MouseButton1Click:Connect(function()
-    abaServidores.Visible = true
-    abaPosicao.Visible = false
-end)
-
--- Botão Salvar Posição
-local botaoSalvar = Instance.new("TextButton", abaPosicao)
-botaoSalvar.Size = UDim2.new(0, 180, 0, 40)
-botaoSalvar.Position = UDim2.new(0.5, -90, 0.3, 0)
-botaoSalvar.Text = "Salvar Posição"
-botaoSalvar.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
-botaoSalvar.MouseButton1Click:Connect(function()
-    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        savedPosition = player.Character.HumanoidRootPart.Position
-        botaoSalvar.Text = "Posição Salva!"
-        wait(1)
-        botaoSalvar.Text = "Salvar Posição"
-    end
-end)
-
--- Botão Voltar
-local botaoVoltar = Instance.new("TextButton", abaPosicao)
-botaoVoltar.Size = UDim2.new(0, 180, 0, 40)
-botaoVoltar.Position = UDim2.new(0.5, -90, 0.5, 0)
-botaoVoltar.Text = "Voltar"
-botaoVoltar.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
-botaoVoltar.MouseButton1Click:Connect(function()
-    if savedPosition and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        player.Character.HumanoidRootPart.CFrame = CFrame.new(savedPosition)
-    end
-end)
-
--- Lista de servidores
-local listaServidores = Instance.new("ScrollingFrame", abaServidores)
-listaServidores.Size = UDim2.new(1, -40, 0.7, -40)
-listaServidores.Position = UDim2.new(0, 20, 0, 20)
-listaServidores.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-listaServidores.CanvasSize = UDim2.new(0, 0, 0, 0)
-listaServidores.ScrollBarThickness = 6
-
--- Botão Buscar Rápido
-local botaoBuscarRapido = Instance.new("TextButton", abaServidores)
-botaoBuscarRapido.Size = UDim2.new(0, 180, 0, 40)
-botaoBuscarRapido.Position = UDim2.new(0.5, -90, 0.85, 0)
-botaoBuscarRapido.Text = "Buscar Rápido"
-botaoBuscarRapido.BackgroundColor3 = Color3.fromRGB(60, 60, 180)
-
-local function atualizarServidores()
-    listaServidores:ClearAllChildren()
-    local servers = buscarServidores()
-    listaServidores.CanvasSize = UDim2.new(0, 0, 0, #servers*45)
-    for i, server in ipairs(servers) do
-        local btn = Instance.new("TextButton", listaServidores)
-        btn.Size = UDim2.new(1, -10, 0, 40)
-        btn.Position = UDim2.new(0, 5, 0, (i-1)*45)
-        btn.Text = ("Brainrots: %dm | Jogadores: %d/%d"):format(math.floor(server.brainrots/1000000), server.playerCount, server.maxPlayers)
-        btn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
-        btn.MouseButton1Click:Connect(function()
-            teleportarParaServidor(server.id)
+        serverButton.MouseButton1Click:Connect(function()
+            selectedServerIndex = i
         end)
     end
+
+    ServerListScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, (#foundServers > 0 and 55 * #foundServers or 100))
 end
 
-botaoBuscarRapido.MouseButton1Click:Connect(function()
-    local servers = buscarServidores()
-    if #servers > 0 then
-        -- Entra no servidor com mais brainrots
-        table.sort(servers, function(a, b) return a.brainrots > b.brainrots end)
-        teleportarParaServidor(servers[1].id)
+------------------------[ Teleporte Seguro ]------------------------
+local function teleportToPlaceInstanceSafe(placeId, serverId, player)
+    if type(placeId) ~= "number" then
+        warn("teleportToPlaceInstanceSafe: placeId deve ser um número.")
+        return false
+    end
+
+    if type(serverId) ~= "string" then
+        warn("teleportToPlaceInstanceSafe: serverId deve ser uma string.")
+        return false
+    end
+
+    if not player or not player:IsA("Player") then
+        warn("teleportToPlaceInstanceSafe: player deve ser um objeto Player válido.")
+        return false
+    end
+
+    local TeleportService = game:GetService("TeleportService")
+    if not TeleportService then
+        warn("teleportToPlaceInstanceSafe: TeleportService não está disponível.")
+        return false
+    end
+
+    local success, message = pcall(function()
+        TeleportService:TeleportToPlaceInstance(placeId, serverId, player)
+    end)
+
+    if success then
+        print(("teleportToPlaceInstanceSafe: Teleporte iniciado para o servidor %s."):format(serverId))
+        return true
     else
-        botaoBuscarRapido.Text = "Nenhum servidor encontrado!"
-        wait(1)
-        botaoBuscarRapido.Text = "Buscar Rápido"
+        warn(("teleportToPlaceInstanceSafe: Falha ao teleportar: %s"):format(tostring(message)))
+        return false
+    end
+end
+
+------------------------[ Eventos dos Botões ]------------------------
+FastSearchButton.MouseButton1Click:Connect(function()
+    if searchingServers then return end
+    searchingServers = true
+    FastSearchButton.Text = "Buscando..."
+    FastSearchButton.BackgroundColor3 = Color3.fromRGB(180, 160, 80)
+    spawn(function()
+        fetchServersAsync(minPlayers)
+        updateServerList()
+        FastSearchButton.Text = "Buscar Rápido"
+        FastSearchButton.BackgroundColor3 = Color3.fromRGB(80, 160, 90)
+        searchingServers = false
+    end)
+end)
+
+EnterButton.MouseButton1Click:Connect(function()
+    if #foundServers == 0 then return end
+    local idx = selectedServerIndex
+    if not idx or not foundServers[idx] then idx = 1 end
+    local server = foundServers[idx]
+    if not server then return end
+    if teleporting then return end
+    teleporting = true
+    EnterButton.Text = "Entrando..."
+    
+    -- Teleporte Seguro
+    local success = teleportToPlaceInstanceSafe(PLACE_ID, server.id, LocalPlayer)
+    
+    if not success then
+        teleporting = false
+        EnterButton.Text = "Erro ao Entrar"
+        wait(2)
+        EnterButton.Text = "Entrar"
+    else
+        wait(5)
+        teleporting = false
+        EnterButton.Text = "Entrar"
     end
 end)
 
--- Atualiza lista ao abrir GUI
-atualizarServidores()
+SavePosButton.MouseButton1Click:Connect(function()
+    local root = getPlayerRoot()
+    if root then
+        savedPosition = copyVector3(root.Position)
+        SavePosButton.Text = "Salvo!"
+        wait(1)
+        SavePosButton.Text = "Salvar Posição"
+    end
+end)
 
--- Recomendo atualizar a lista a cada X segundos
-spawn(function()
-    while true do
-        wait(30)
-        if abaServidores.Visible then
-            atualizarServidores()
+BackButton.MouseButton1Click:Connect(function()
+    if savedPosition then
+        local root = getPlayerRoot()
+        if root then
+            root.CFrame = CFrame.new(savedPosition)
+            BackButton.Text = "Voltando..."
+            wait(1)
+            BackButton.Text = "Voltar"
         end
     end
+end)
+
+------------------------[ Inicialização ]------------------------
+createUI()
+showTab(1)
+updateServerList()
+
+NextTabArrow.MouseButton1Click:Connect(function() 
+    showTab(2) 
+end)
+
+PrevTabArrow.MouseButton1Click:Connect(function() 
+    showTab(1) 
 end)
