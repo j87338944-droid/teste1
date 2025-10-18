@@ -1,0 +1,214 @@
+-- BRAINROT FARM + SERVER HOP
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+local MIN_VAL = 60000000 -- 60M+
+local placeId = game.PlaceId
+local savedPos = nil
+local brainrots = {}
+local autoHop = false
+
+-- Criar GUI
+local sg = Instance.new("ScreenGui", player.PlayerGui)
+sg.ResetOnSpawn = false
+
+local f = Instance.new("Frame", sg)
+f.Size = UDim2.new(0, 320, 0, 280)
+f.Position = UDim2.new(0.5, -160, 0.5, -140)
+f.BackgroundColor3 = Color3.fromRGB(18, 18, 25)
+f.Active = true
+f.Draggable = true
+Instance.new("UICorner", f).CornerRadius = UDim.new(0, 12)
+Instance.new("UIStroke", f).Color = Color3.fromRGB(138, 43, 226)
+
+-- Título
+local t = Instance.new("TextLabel", f)
+t.Size = UDim2.new(1, 0, 0, 35)
+t.BackgroundTransparency = 1
+t.Text = "🧠 BRAINROT FARM 60M+"
+t.TextColor3 = Color3.fromRGB(200, 100, 255)
+t.Font = Enum.Font.GothamBold
+t.TextSize = 16
+
+-- Status
+local s = Instance.new("TextLabel", f)
+s.Name = "Status"
+s.Size = UDim2.new(0.94, 0, 0, 60)
+s.Position = UDim2.new(0.03, 0, 0, 40)
+s.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
+s.Text = "✅ Pronto | 💎 0 Brainrots\n📍 Posição: Não Salva"
+s.TextColor3 = Color3.fromRGB(100, 255, 150)
+s.Font = Enum.Font.GothamBold
+s.TextSize = 12
+s.TextWrapped = true
+Instance.new("UICorner", s).CornerRadius = UDim.new(0, 8)
+
+-- Função criar botão
+local function btn(txt, y, color, fn)
+    local b = Instance.new("TextButton", f)
+    b.Size = UDim2.new(0.94, 0, 0, 35)
+    b.Position = UDim2.new(0.03, 0, 0, y)
+    b.BackgroundColor3 = color
+    b.Text = txt
+    b.TextColor3 = Color3.white
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 13
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    b.MouseButton1Click:Connect(fn)
+    return b
+end
+
+-- Buscar Brainrots 60M+
+local function scan()
+    brainrots = {}
+    s.Text = "🔍 Escaneando...\n⏳ Procurando 60M+"
+    s.TextColor3 = Color3.fromRGB(255, 200, 100)
+    wait(0.1)
+    
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") or obj:IsA("Part") then
+            -- Buscar valor
+            local val = nil
+            local valObj = obj:FindFirstChild("Value") or obj:FindFirstChild("Worth")
+            
+            if valObj and (valObj:IsA("NumberValue") or valObj:IsA("IntValue")) then
+                val = valObj.Value
+            end
+            
+            -- Verificar no nome
+            if not val and obj.Name:match("%d+") then
+                val = tonumber(obj.Name:match("%d+"))
+            end
+            
+            if val and val >= MIN_VAL then
+                local pos = nil
+                if obj:IsA("Model") then
+                    local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("Part")
+                    if part then pos = part.Position end
+                elseif obj:IsA("Part") then
+                    pos = obj.Position
+                end
+                
+                if pos then
+                    table.insert(brainrots, {
+                        obj = obj,
+                        val = val,
+                        pos = pos,
+                        name = obj.Name
+                    })
+                end
+            end
+        end
+    end
+    
+    table.sort(brainrots, function(a,b) return a.val > b.val end)
+    
+    if #brainrots > 0 then
+        s.Text = string.format("✅ ACHEI! 💎 %d Brainrots\n🏆 Maior: $%.0fM", 
+            #brainrots, brainrots[1].val / 1000000)
+        s.TextColor3 = Color3.fromRGB(100, 255, 150)
+    else
+        s.Text = "❌ Nenhum 60M+ aqui\n🔄 Use SERVER HOP"
+        s.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end
+
+-- Pegar Brainrot (TELEPORTA AUTOMATICAMENTE)
+local function farm()
+    if #brainrots == 0 then 
+        s.Text = "⚠️ Escaneie primeiro!\n🔍 Clique em ESCANEAR"
+        s.TextColor3 = Color3.fromRGB(255, 200, 100)
+        return 
+    end
+    
+    local br = brainrots[1]
+    s.Text = string.format("🚀 Teleportando...\n💎 $%.0fM", br.val / 1000000)
+    s.TextColor3 = Color3.fromRGB(100, 200, 255)
+    
+    -- TELEPORTAR
+    hrp.CFrame = CFrame.new(br.pos)
+    wait(0.5)
+    
+    s.Text = "💎 PEGANDO...\n⏳ Coletando"
+    
+    -- Aproximar mais se for Model
+    if br.obj:IsA("Model") then
+        local part = br.obj.PrimaryPart or br.obj:FindFirstChildWhichIsA("Part")
+        if part then 
+            hrp.CFrame = part.CFrame 
+        end
+    else
+        hrp.CFrame = br.obj.CFrame
+    end
+    
+    wait(1)
+    
+    -- VOLTAR se tiver posição salva
+    if savedPos then
+        s.Text = "↩️ Voltando...\n📍 Retornando"
+        wait(0.3)
+        hrp.CFrame = CFrame.new(savedPos)
+        wait(0.5)
+    end
+    
+    table.remove(brainrots, 1)
+    s.Text = string.format("✅ Coletado!\n💎 %d restantes", #brainrots)
+    s.TextColor3 = Color3.fromRGB(100, 255, 150)
+    
+    wait(1)
+    
+    -- Re-escanear
+    if #brainrots == 0 then
+        scan()
+    end
+end
+
+-- SERVER HOP (procurar servidores com 60M+)
+local function serverHop()
+    s.Text = "🔄 PROCURANDO SERVIDOR...\n⏳ Buscando 60M+"
+    s.TextColor3 = Color3.fromRGB(255, 200, 100)
+    
+    local success, result = pcall(function()
+        local servers = HttpService:JSONDecode(game:HttpGet(
+            "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"
+        ))
+        
+        if servers and servers.data then
+            for _, server in pairs(servers.data) do
+                if server.id ~= game.JobId and server.playing < server.maxPlayers - 1 then
+                    s.Text = "🚀 Entrando servidor...\n⏳ Teleportando"
+                    TeleportService:TeleportToPlaceInstance(placeId, server.id, player)
+                    return
+                end
+            end
+        end
+    end)
+    
+    if not success then
+        s.Text = "❌ Erro ao buscar\n🔄 Tente novamente"
+        s.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end
+
+-- Botões
+btn("📍 SALVAR POSIÇÃO", 110, Color3.fromRGB(50, 150, 255), function() 
+    savedPos = hrp.Position 
+    s.Text = "✅ Posição Salva!\n📍 " .. tostring(math.floor(savedPos.X)) .. ", " .. tostring(math.floor(savedPos.Z))
+    s.TextColor3 = Color3.fromRGB(100, 255, 150)
+end)
+
+btn("🔍 ESCANEAR 60M+", 155, Color3.fromRGB(138, 43, 226), scan)
+
+btn("🚀 PEGAR BRAINROT", 200, Color3.fromRGB(50, 255, 100), farm)
+
+btn("🔄 TROCAR SERVIDOR", 245, Color3.fromRGB(255, 150, 50), serverHop)
+
+-- Auto-scan inicial
+wait(1)
+print("✅ Brainrot Farm 60M+ carregado!")
+scan()
