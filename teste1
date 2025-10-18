@@ -286,7 +286,24 @@ end)
 TeleportBackButton.MouseButton1Click:Connect(function()
     if savedPosition then
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            LocalPlayer.Character.HumanoidRootPart.CFrame = savedPosition
+            local hrp = LocalPlayer.Character.HumanoidRootPart
+            local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+            
+            -- Desabilitar física temporariamente
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+            end
+            
+            -- Teleportar usando diferentes métodos para maior compatibilidade
+            hrp.CFrame = savedPosition
+            hrp.Anchored = true
+            task.wait(0.1)
+            hrp.Anchored = false
+            
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+            end
+            
             StatusLabel.Text = "✅ Teleportado de volta!"
             StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
             TeleportBackButton.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
