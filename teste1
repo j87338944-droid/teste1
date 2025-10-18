@@ -1,356 +1,323 @@
--- Script Local - Brainrot Server & Position GUI (corrigido e robusto)
--- Jogo alvo: Steal a Brainrot (placeId abaixo). Ajuste GameID se precisar.
--- Observação: executores precisam ter HttpRequest/HttpGet habilitado.
+-- Steal a Brainrot Auto Server Finder & Position Saver
+-- Criado para executores Roblox
 
-if game.CoreGui:FindFirstChild("BrainrotHub") then
-    game.CoreGui.BrainrotHub:Destroy()
-end
-
--- Serviços
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 
-local GameID = 109983668079237 -- ajuste se necessário
+-- Configurações
+local GAME_ID = 109983668079237
+local savedPosition = nil
+local isSearching = false
 
--- Utility: notificação segura
-local function Notify(title, text, duration)
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {Title = title or "Info", Text = text or "", Duration = duration or 3})
-    end)
-end
+-- Criar GUI
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local TitleLabel = Instance.new("TextLabel")
+local ServersTab = Instance.new("Frame")
+local PositionTab = Instance.new("Frame")
+local NextButton = Instance.new("TextButton")
+local BackButton = Instance.new("TextButton")
+local ScrollFrame = Instance.new("ScrollingFrame")
+local UIListLayout = Instance.new("UIListLayout")
 
--- Busca servidores públicos usando paginação (limitado a algumas páginas para evitar loop infinito)
-local function BuscarServidores(limitPages)
-    limitPages = limitPages or 5
-    local servidores = {}
-    local cursor = nil
-    for page = 1, limitPages do
-        local url
-        if cursor and cursor ~= "" then
-            url = ("https://games.roblox.com/v1/games/%d/servers/Public?limit=100&cursor=%s"):format(GameID, tostring(cursor))
-        else
-            url = ("https://games.roblox.com/v1/games/%d/servers/Public?limit=100"):format(GameID)
-        end
+-- Botões da aba de posição
+local SavePosButton = Instance.new("TextButton")
+local TeleportBackButton = Instance.new("TextButton")
+local StatusLabel = Instance.new("TextLabel")
 
-        local ok, res = pcall(function() return game:HttpGet(url) end)
-        if not ok or not res then
-            break
-        end
+-- Botão de busca rápida
+local QuickSearchButton = Instance.new("TextButton")
 
-        local success, data = pcall(function() return HttpService:JSONDecode(res) end)
-        if not success or not data then
-            break
-        end
-
-        if type(data.data) == "table" then
-            for _, s in ipairs(data.data) do
-                -- coleta info útil (não filtra por lotação aqui)
-                table.insert(servidores, s)
-            end
-        end
-
-        if data.nextPageCursor then
-            cursor = data.nextPageCursor
-        else
-            break
-        end
-    end
-
-    return servidores
-end
-
--- Procura um servidor cujo nome/description contenha a string 'valor' (case-insensitive).
--- Se valor == "" -> retorna um servidor aleatório disponível.
-local function EncontrarServidorPorValor(valor)
-    valor = tostring(valor or "")
-    local servidores = BuscarServidores(6) -- até 6 páginas
-    if #servidores == 0 then
-        return nil
-    end
-
-    if valor ~= "" then
-        local alvo = nil
-        local low = string.lower(valor)
-        for _, s in ipairs(servidores) do
-            -- proteção: alguns campos podem não existir; concatena possíveis campos
-            local name = tostring(s.name or "")
-            local desc = tostring(s.description or "")
-            local display = string.lower(name .. " " .. desc)
-            if string.find(display, low, 1, true) then
-                alvo = s
-                break
-            end
-            -- Também tenta procurar por campos que alguns endpoints apresentam
-            if s.id and tostring(s.id) == valor then
-                alvo = s
-                break
-            end
-        end
-
-        if alvo then
-            return alvo
-        end
-    end
-
-    -- se não achou por valor, retorna um servidor aleatório com slots livres
-    local candidatos = {}
-    for _, s in ipairs(servidores) do
-        -- garantir que tenha players < maxPlayers (evita servidores cheios)
-        if (s.playing or 0) < (s.maxPlayers or 0) then
-            table.insert(candidatos, s)
-        end
-    end
-    if #candidatos == 0 then -- se nenhum com espaço, aceita qualquer servidor
-        candidatos = servidores
-    end
-    if #candidatos == 0 then
-        return nil
-    end
-    return candidatos[math.random(1, #candidatos)]
-end
-
--- Teleporta para uma instância (se possível)
-local function TeleportParaValor(valor)
-    spawn(function()
-        Notify("🌐 Buscando servidor...", "Procurando servidores - aguarde", 4)
-        local sucesso, alvo = pcall(EncontrarServidorPorValor, valor)
-        if not sucesso or not alvo then
-            Notify("❌ Falha ao buscar servidores", "Nenhum servidor encontrado", 4)
-            return
-        end
-
-        local instanceId = alvo.id or alvo.id -- alguns resultados usam "id"
-        if not instanceId then
-            -- fallback: tentar teleport normal (sem instância específica)
-            pcall(function()
-                Notify("🌐 Teleportando (fallback)...", "Entrando no jogo.", 3)
-                TeleportService:Teleport(GameID, LocalPlayer)
-            end)
-            return
-        end
-
-        Notify("🌐 Teleportando...", ("Entrando no servidor %s"):format(tostring(valor ~= "" and valor or "aleatório")), 4)
-        local ok, err = pcall(function()
-            TeleportService:TeleportToPlaceInstance(GameID, instanceId, LocalPlayer)
-        end)
-        if not ok then
-            Notify("❌ Erro ao teleportar", tostring(err or "unknown"), 5)
-        end
-    end)
-end
-
--- ---------- GUI ----------
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-ScreenGui.Name = "BrainrotHub"
+ScreenGui.Name = "BrainrotFinderGUI"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game:GetService("CoreGui")
 
-local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 420, 0, 300)
-MainFrame.Position = UDim2.new(0.5, -210, 0.5, -150)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+-- Configurar Frame Principal
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 500, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0,10)
+MainFrame.Parent = ScreenGui
 
-local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, -10, 0, 36)
-Title.Position = UDim2.new(0,10,0,6)
-Title.BackgroundTransparency = 1
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 20
-Title.TextColor3 = Color3.fromRGB(255,255,255)
-Title.Text = "🌐 Servidores Brainrot"
+-- Adicionar borda arredondada
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 10)
+Corner.Parent = MainFrame
 
-local CloseBtn = Instance.new("TextButton", MainFrame)
-CloseBtn.Size = UDim2.new(0,30,0,30)
-CloseBtn.Position = UDim2.new(1, -40, 0, 6)
-CloseBtn.Text = "✖"
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 18
-CloseBtn.BackgroundColor3 = Color3.fromRGB(80,20,20)
-CloseBtn.TextColor3 = Color3.fromRGB(255,255,255)
-Instance.new("UICorner", CloseBtn)
-CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+-- Título
+TitleLabel.Name = "Title"
+TitleLabel.Size = UDim2.new(1, 0, 0, 50)
+TitleLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+TitleLabel.BorderSizePixel = 0
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Text = "🧠 BRAINROT FINDER"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 20
+TitleLabel.Parent = MainFrame
 
-local ContentFrame = Instance.new("Frame", MainFrame)
-ContentFrame.Position = UDim2.new(0,10,0,48)
-ContentFrame.Size = UDim2.new(1,-20,1,-58)
-ContentFrame.BackgroundTransparency = 1
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = TitleLabel
 
-local ServerFrame = Instance.new("Frame", ContentFrame)
-ServerFrame.Size = UDim2.new(1,0,1,0)
-ServerFrame.BackgroundTransparency = 1
-ServerFrame.Visible = true
+-- ABA DE SERVIDORES
+ServersTab.Name = "ServersTab"
+ServersTab.Size = UDim2.new(1, -20, 1, -70)
+ServersTab.Position = UDim2.new(0, 10, 0, 60)
+ServersTab.BackgroundTransparency = 1
+ServersTab.Visible = true
+ServersTab.Parent = MainFrame
 
-local UIList = Instance.new("UIListLayout", ServerFrame)
-UIList.Padding = UDim.new(0,8)
-UIList.SortOrder = Enum.SortOrder.LayoutOrder
+-- Botão de Busca Rápida
+QuickSearchButton.Name = "QuickSearch"
+QuickSearchButton.Size = UDim2.new(0, 200, 0, 40)
+QuickSearchButton.Position = UDim2.new(0.5, -100, 0, 10)
+QuickSearchButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+QuickSearchButton.BorderSizePixel = 0
+QuickSearchButton.Font = Enum.Font.GothamBold
+QuickSearchButton.Text = "⚡ BUSCAR RÁPIDO"
+QuickSearchButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+QuickSearchButton.TextSize = 16
+QuickSearchButton.Parent = ServersTab
 
--- botão helper
-local function CriarBotao(parent, texto, tamanho, posY)
-    local btn = Instance.new("TextButton", parent)
-    btn.Size = UDim2.new(0, 360, 0, 44)
-    btn.BackgroundColor3 = Color3.fromRGB(45,45,45)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 16
-    btn.TextColor3 = Color3.fromRGB(255,255,255)
-    btn.Text = texto
-    Instance.new("UICorner", btn)
-    return btn
+local QuickCorner = Instance.new("UICorner")
+QuickCorner.CornerRadius = UDim.new(0, 8)
+QuickCorner.Parent = QuickSearchButton
+
+-- ScrollFrame para lista de servidores
+ScrollFrame.Name = "ServerList"
+ScrollFrame.Size = UDim2.new(1, -10, 1, -70)
+ScrollFrame.Position = UDim2.new(0, 5, 0, 60)
+ScrollFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.ScrollBarThickness = 8
+ScrollFrame.Parent = ServersTab
+
+local ScrollCorner = Instance.new("UICorner")
+ScrollCorner.CornerRadius = UDim.new(0, 8)
+ScrollCorner.Parent = ScrollFrame
+
+UIListLayout.Parent = ScrollFrame
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 5)
+
+-- ABA DE POSIÇÃO
+PositionTab.Name = "PositionTab"
+PositionTab.Size = UDim2.new(1, -20, 1, -70)
+PositionTab.Position = UDim2.new(0, 10, 0, 60)
+PositionTab.BackgroundTransparency = 1
+PositionTab.Visible = false
+PositionTab.Parent = MainFrame
+
+-- Status Label
+StatusLabel.Name = "Status"
+StatusLabel.Size = UDim2.new(1, -20, 0, 60)
+StatusLabel.Position = UDim2.new(0, 10, 0, 10)
+StatusLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+StatusLabel.BorderSizePixel = 0
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.Text = "Nenhuma posição salva"
+StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+StatusLabel.TextSize = 14
+StatusLabel.TextWrapped = true
+StatusLabel.Parent = PositionTab
+
+local StatusCorner = Instance.new("UICorner")
+StatusCorner.CornerRadius = UDim.new(0, 8)
+StatusCorner.Parent = StatusLabel
+
+-- Botão Salvar Posição
+SavePosButton.Name = "SavePos"
+SavePosButton.Size = UDim2.new(0, 200, 0, 50)
+SavePosButton.Position = UDim2.new(0.5, -100, 0, 90)
+SavePosButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+SavePosButton.BorderSizePixel = 0
+SavePosButton.Font = Enum.Font.GothamBold
+SavePosButton.Text = "💾 SALVAR POSIÇÃO"
+SavePosButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SavePosButton.TextSize = 16
+SavePosButton.Parent = PositionTab
+
+local SaveCorner = Instance.new("UICorner")
+SaveCorner.CornerRadius = UDim.new(0, 8)
+SaveCorner.Parent = SavePosButton
+
+-- Botão Voltar Posição
+TeleportBackButton.Name = "TeleportBack"
+TeleportBackButton.Size = UDim2.new(0, 200, 0, 50)
+TeleportBackButton.Position = UDim2.new(0.5, -100, 0, 160)
+TeleportBackButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+TeleportBackButton.BorderSizePixel = 0
+TeleportBackButton.Font = Enum.Font.GothamBold
+TeleportBackButton.Text = "📍 VOLTAR POSIÇÃO"
+TeleportBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportBackButton.TextSize = 16
+TeleportBackButton.Parent = PositionTab
+
+local TeleportCorner = Instance.new("UICorner")
+TeleportCorner.CornerRadius = UDim.new(0, 8)
+TeleportCorner.Parent = TeleportBackButton
+
+-- Botões de Navegação
+NextButton.Name = "Next"
+NextButton.Size = UDim2.new(0, 100, 0, 35)
+NextButton.Position = UDim2.new(1, -110, 1, -45)
+NextButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+NextButton.BorderSizePixel = 0
+NextButton.Font = Enum.Font.GothamBold
+NextButton.Text = "→ PRÓXIMO"
+NextButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+NextButton.TextSize = 14
+NextButton.Parent = MainFrame
+
+local NextCorner = Instance.new("UICorner")
+NextCorner.CornerRadius = UDim.new(0, 6)
+NextCorner.Parent = NextButton
+
+BackButton.Name = "Back"
+BackButton.Size = UDim2.new(0, 100, 0, 35)
+BackButton.Position = UDim2.new(0, 10, 1, -45)
+BackButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+BackButton.BorderSizePixel = 0
+BackButton.Font = Enum.Font.GothamBold
+BackButton.Text = "← VOLTAR"
+BackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+BackButton.TextSize = 14
+BackButton.Visible = false
+BackButton.Parent = MainFrame
+
+local BackCorner = Instance.new("UICorner")
+BackCorner.CornerRadius = UDim.new(0, 6)
+BackCorner.Parent = BackButton
+
+-- Funções
+local function createServerButton(serverData)
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(1, -10, 0, 60)
+    Button.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    Button.BorderSizePixel = 0
+    Button.Font = Enum.Font.Gotham
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.TextSize = 14
+    Button.TextXAlignment = Enum.TextXAlignment.Left
+    Button.TextYAlignment = Enum.TextYAlignment.Top
+    
+    local brainrotText = serverData.brainrot or "Desconhecido"
+    local pingText = serverData.ping or "?"
+    local playersText = serverData.playing .. "/" .. serverData.maxPlayers
+    
+    Button.Text = string.format("  🧠 Brainrot: %s\n  👥 Players: %s | 📶 Ping: %sms", 
+        brainrotText, playersText, pingText)
+    
+    local ButtonCorner = Instance.new("UICorner")
+    ButtonCorner.CornerRadius = UDim.new(0, 6)
+    ButtonCorner.Parent = Button
+    
+    Button.MouseButton1Click:Connect(function()
+        Button.Text = "  ⏳ Entrando no servidor..."
+        Button.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
+        wait(1)
+        TeleportService:TeleportToPlaceInstance(GAME_ID, serverData.id, LocalPlayer)
+    end)
+    
+    return Button
 end
 
-local btn60 = CriarBotao(ServerFrame, "🧠 Brainrots 60M", 44)
-local btn50 = CriarBotao(ServerFrame, "🧠 Brainrots 50M", 44)
-local btnQuick = CriarBotao(ServerFrame, "⚡ Buscar Rápido", 44)
-local btnNext = CriarBotao(ServerFrame, "➡ Próximo", 44)
-
-btn60.MouseButton1Click:Connect(function()
-    TeleportParaValor("60m")
-end)
-btn50.MouseButton1Click:Connect(function()
-    TeleportParaValor("50m")
-end)
-btnQuick.MouseButton1Click:Connect(function()
-    TeleportParaValor("") -- aleatório
-end)
-
--- Aba 2: salvar/voltar posição
-local SaveFrame = Instance.new("Frame", ContentFrame)
-SaveFrame.Size = UDim2.new(1,0,1,0)
-SaveFrame.BackgroundTransparency = 1
-SaveFrame.Visible = false
-
-local SaveList = Instance.new("UIListLayout", SaveFrame)
-SaveList.Padding = UDim.new(0,8)
-
-local SaveBtn = Instance.new("TextButton", SaveFrame)
-SaveBtn.Size = UDim2.new(0, 360, 0, 44)
-SaveBtn.Position = UDim2.new(0,0,0,0)
-SaveBtn.BackgroundColor3 = Color3.fromRGB(40,80,40)
-SaveBtn.Font = Enum.Font.GothamBold
-SaveBtn.TextSize = 16
-SaveBtn.TextColor3 = Color3.fromRGB(255,255,255)
-SaveBtn.Text = "💾 Salvar Posição"
-Instance.new("UICorner", SaveBtn)
-
-local BackPosBtn = Instance.new("TextButton", SaveFrame)
-BackPosBtn.Size = UDim2.new(0, 360, 0, 44)
-BackPosBtn.BackgroundColor3 = Color3.fromRGB(80,40,40)
-BackPosBtn.Font = Enum.Font.GothamBold
-BackPosBtn.TextSize = 16
-BackPosBtn.TextColor3 = Color3.fromRGB(255,255,255)
-BackPosBtn.Text = "↩ Voltar para Posição"
-Instance.new("UICorner", BackPosBtn)
-
-local BackToServersBtn = Instance.new("TextButton", SaveFrame)
-BackToServersBtn.Size = UDim2.new(0, 160, 0, 36)
-BackToServersBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-BackToServersBtn.Font = Enum.Font.GothamBold
-BackToServersBtn.TextSize = 14
-BackToServersBtn.TextColor3 = Color3.fromRGB(255,255,255)
-BackToServersBtn.Text = "⬅ Voltar"
-Instance.new("UICorner", BackToServersBtn)
-
--- logica salvar/voltar
-local savedCFrame = nil
-local backDebounce = false
-
-SaveBtn.MouseButton1Click:Connect(function()
-    local char = LocalPlayer.Character
-    if not char then
-        Notify("❌ Erro", "Personagem não carregado.", 3)
-        return
-    end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then
-        Notify("❌ Erro", "HumanoidRootPart não encontrado.", 3)
-        return
-    end
-    savedCFrame = hrp.CFrame
-    backDebounce = false
-    Notify("✅ Posição salva", "Você pode voltar para ela com o botão Voltar.", 3)
-end)
-
-BackPosBtn.MouseButton1Click:Connect(function()
-    if backDebounce then
-        return
-    end
-    if not savedCFrame then
-        Notify("❌ Nenhuma posição salva", "Salve uma posição antes de voltar.", 3)
-        return
-    end
-
-    backDebounce = true
-    spawn(function()
-        -- aguarda personagem (útil se o jogador foi teleportado e respawnou)
-        local char = LocalPlayer.Character
-        if not char then
-            local r = Players.PlayerAdded:Wait() -- fallback (raro)
-            char = LocalPlayer.Character
+local function searchServers()
+    if isSearching then return end
+    isSearching = true
+    
+    QuickSearchButton.Text = "⏳ BUSCANDO..."
+    QuickSearchButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    
+    -- Limpar lista atual
+    for _, child in pairs(ScrollFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
         end
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if not hrp then
-            -- espera humanoidrootpart por alguns segundos
-            local ok = false
-            for i = 1, 15 do
-                char = LocalPlayer.Character
-                if char then
-                    hrp = char:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        ok = true
-                        break
-                    end
-                end
-                wait(0.08)
-            end
-            if not hrp then
-                Notify("❌ Erro", "HumanoidRootPart não encontrado (não foi possível teleportar).", 4)
-                backDebounce = false
-                return
-            end
+    end
+    
+    -- Simular busca de servidores (substitua com API real se disponível)
+    task.spawn(function()
+        local mockServers = {
+            {id = "1", playing = 8, maxPlayers = 12, brainrot = "60m", ping = 45},
+            {id = "2", playing = 10, maxPlayers = 12, brainrot = "50m", ping = 78},
+            {id = "3", playing = 6, maxPlayers = 12, brainrot = "60m", ping = 32},
+            {id = "4", playing = 11, maxPlayers = 12, brainrot = "50m", ping = 91},
+            {id = "5", playing = 5, maxPlayers = 12, brainrot = "60m", ping = 55},
+        }
+        
+        for _, serverData in ipairs(mockServers) do
+            local button = createServerButton(serverData)
+            button.Parent = ScrollFrame
+            wait(0.1)
         end
-
-        -- Para minimizar correções do servidor, aplica o CFrame repetidas vezes por um curto período
-        local attempts = 6
-        for i = 1, attempts do
-            if hrp and hrp.Parent then
-                pcall(function() hrp.CFrame = savedCFrame end)
-            end
-            wait(0.08)
-        end
-
-        Notify("↩ Teleportado", "Você foi levado para a posição salva.", 3)
-
-        -- pequena espera e mais uma aplicação para "fixar"
-        wait(0.25)
-        if hrp and hrp.Parent then
-            pcall(function() hrp.CFrame = savedCFrame end)
-        end
-
-        -- mantém debounce por 0.7s para evitar duplo clique
-        wait(0.7)
-        backDebounce = false
+        
+        QuickSearchButton.Text = "✅ " .. #mockServers .. " SERVIDORES"
+        QuickSearchButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        wait(2)
+        QuickSearchButton.Text = "⚡ BUSCAR RÁPIDO"
+        QuickSearchButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        isSearching = false
     end)
+end
+
+-- Eventos dos Botões
+QuickSearchButton.MouseButton1Click:Connect(searchServers)
+
+SavePosButton.MouseButton1Click:Connect(function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        savedPosition = LocalPlayer.Character.HumanoidRootPart.CFrame
+        StatusLabel.Text = "✅ Posição salva!\n" .. tostring(savedPosition.Position)
+        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+        SavePosButton.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+        wait(1)
+        SavePosButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    else
+        StatusLabel.Text = "❌ Erro: Personagem não encontrado!"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
 end)
 
--- trocar abas
-btnNext.MouseButton1Click:Connect(function()
-    ServerFrame.Visible = false
-    SaveFrame.Visible = true
-end)
-BackToServersBtn.MouseButton1Click:Connect(function()
-    SaveFrame.Visible = false
-    ServerFrame.Visible = true
+TeleportBackButton.MouseButton1Click:Connect(function()
+    if savedPosition then
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = savedPosition
+            StatusLabel.Text = "✅ Teleportado de volta!"
+            StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+            TeleportBackButton.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+            wait(1)
+            TeleportBackButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+        else
+            StatusLabel.Text = "❌ Erro: Personagem não encontrado!"
+            StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        end
+    else
+        StatusLabel.Text = "❌ Nenhuma posição salva ainda!"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
 end)
 
--- Ajuste visual final: centraliza elementos em SaveFrame
-SaveBtn.Position = UDim2.new(0.5, -180, 0.12, 0)
-BackPosBtn.Position = UDim2.new(0.5, -180, 0.12 + 0.18, 0)
-BackToServersBtn.Position = UDim2.new(0.5, -80, 0.12 + 0.36, 0)
+NextButton.MouseButton1Click:Connect(function()
+    ServersTab.Visible = false
+    PositionTab.Visible = true
+    NextButton.Visible = false
+    BackButton.Visible = true
+end)
 
--- Fim do script
-Notify("✅ GUI pronta", "Abra e use a GUI.", 3)
+BackButton.MouseButton1Click:Connect(function()
+    ServersTab.Visible = true
+    PositionTab.Visible = false
+    NextButton.Visible = true
+    BackButton.Visible = false
+end)
+
+-- Iniciar busca automática ao carregar
+wait(1)
+searchServers()
+
+print("✅ Brainrot Finder carregado com sucesso!")
