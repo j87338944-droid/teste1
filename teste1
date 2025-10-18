@@ -1,186 +1,166 @@
---[[
-STEAL A BRAINROT - DELTA EXECUTOR SCRIPT
-- Auto teleport para servidor rico (50m/60m)
-- Salvar posição → invisível + invulnerável (delta)
-- Voltar posição → restaura visibilidade + vulnerabilidade
-- Para executores tipo Solara, Wave, Electron
---]]
+-- LocalScript para StarterGui
 
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local LocalPlayer = Players.LocalPlayer
+local player = Players.LocalPlayer
+local savedPosition = nil
 
-local GAME_ID = 109983668079237
-local MAX_PAGES = 5
-local BRAINROT_VALUES = {50000000,60000000}
+-- IDs e configs
+local PLACE_ID = 109983668079237 -- Steal a Brainrot
+local BRAINROT_MIN = 50000000 -- 50m
+local BRAINROT_MAX = 60000000 -- 60m
 
--- VARS
-local savedCFrame = nil
-local deltaInvulnerable = false
-local healthConn = nil
-local originalTransparency = {}
-local originalCollide = {}
-
--- UTIL
-local function Create(class, props)
-    local obj = Instance.new(class)
-    if props then
-        for k,v in pairs(props) do
-            pcall(function() obj[k] = v end)
-        end
-    end
-    return obj
-end
-
--- ===== DELTA INVULNERÁVEL =====
-local function ActivateDelta()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
-
-    originalTransparency = {}
-    originalCollide = {}
-    for _, part in pairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            originalTransparency[part] = part.LocalTransparencyModifier
-            part.LocalTransparencyModifier = 1
-            originalCollide[part] = part.CanCollide
-            part.CanCollide = false
-        end
-    end
-
-    deltaInvulnerable = true
-    if healthConn then healthConn:Disconnect() end
-    healthConn = humanoid:GetPropertyChangedSignal("Health"):Connect(function()
-        if deltaInvulnerable then
-            humanoid.Health = humanoid.MaxHealth
-        end
-    end)
-end
-
-local function DeactivateDelta()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if humanoid and healthConn then
-        healthConn:Disconnect()
-        healthConn = nil
-    end
-    for part, trans in pairs(originalTransparency) do
-        if part and part.Parent then part.LocalTransparencyModifier = trans end
-    end
-    for part, collide in pairs(originalCollide) do
-        if part and part.Parent then part.CanCollide = collide end
-    end
-    deltaInvulnerable = false
-end
-
--- ===== SALVAR POSIÇÃO =====
-local function SavePosition()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    savedCFrame = hrp.CFrame
-    ActivateDelta()
-    print("✅ Posição salva e delta ativado!")
-end
-
--- ===== VOLTAR PARA POSIÇÃO =====
-local function ReturnPosition()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not hrp or not humanoid then
-        warn("❌ HumanoidRootPart não encontrado!")
-        return
-    end
-    if not savedCFrame then
-        warn("❌ Nenhuma posição salva!")
-        return
-    end
-    -- Teleporte delta
-    hrp.CFrame = savedCFrame
-    hrp.AssemblyLinearVelocity = Vector3.zero
-    hrp.AssemblyAngularVelocity = Vector3.zero
-    humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-    DeactivateDelta()
-    print("✅ Teleportado para posição salva!")
-end
-
--- ===== BUSCA SERVIDORES =====
-local function CheckServerForBrainrot(server)
-    -- API pública não retorna leaderstats de outros jogadores
-    -- Simulação para auto-teleport
-    local seed = tonumber(tostring(server.id):sub(-6)) or tonumber(tostring(os.time()):sub(-6))
-    local r = (seed % 100)
-    if r < 6 then
-        return true -- servidor "rico" simulado
-    end
-    return false
-end
-
-local function FetchServersAndTeleport()
-    local pageCursor = nil
-    for page = 1, MAX_PAGES do
-        local url = "https://games.roblox.com/v1/games/"..GAME_ID.."/servers/Public?sortOrder=Desc&limit=100"
-        if pageCursor then url = url .. "&cursor="..pageCursor end
-        local response = nil
-        local success, res = pcall(function() return game:HttpGet(url) end)
-        if success then response = res else warn("HttpGet falhou!") break end
+-- Função que busca servidores filtrando brainrots
+local function buscarServidores()
+    local servers = {}
+    local try = pcall(function()
+        local url = ("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100"):format(PLACE_ID)
+        local response = HttpService:GetAsync(url)
         local data = HttpService:JSONDecode(response)
-        pageCursor = data.nextPageCursor
-        for _, server in pairs(data.data) do
-            if server.playing > 0 and server.playing < server.maxPlayers then
-                if CheckServerForBrainrot(server) then
-                    print("🔹 Teleportando para servidor rico: "..server.id)
-                    pcall(function()
-                        TeleportService:TeleportToPlaceInstance(GAME_ID, server.id, LocalPlayer)
-                    end)
-                    return
+        for _, server in ipairs(data.data) do
+            if server.playerCount < server.maxPlayers then
+                -- Supondo que a quantidade de brainrots é armazenada em server.attributes.brainrots
+                local brainrots = server.attributes and server.attributes.brainrots or 0
+                if brainrots >= BRAINROT_MIN and brainrots <= BRAINROT_MAX then
+                    table.insert(servers, {
+                        id = server.id,
+                        brainrots = brainrots,
+                        playerCount = server.playerCount,
+                        maxPlayers = server.maxPlayers
+                    })
                 end
             end
         end
-        if not pageCursor then break end
-    end
-    warn("❌ Nenhum servidor rico encontrado!")
+    end)
+    return servers
 end
 
--- ===== GUI SIMPLES =====
-local gui = Create("ScreenGui",{Parent=LocalPlayer:WaitForChild("PlayerGui"), Name="DeltaBrainrotGUI", ResetOnSpawn=false})
+-- Função para teleportar para um servidor específico
+local function teleportarParaServidor(serverId)
+    TeleportService:TeleportToPlaceInstance(PLACE_ID, serverId, player)
+end
 
-local frame = Create("Frame",{
-    Parent = gui,
-    Size = UDim2.new(0,300,0,150),
-    Position = UDim2.new(0.5,-150,0.5,-75),
-    BackgroundColor3 = Color3.fromRGB(20,20,25),
-    BorderSizePixel = 0
-})
+-- GUI Setup
+local screenGui = Instance.new("ScreenGui", player.PlayerGui)
+screenGui.Name = "BrainrotGui"
 
-local saveBtn = Create("TextButton",{
-    Parent = frame,
-    Text = "💾 Salvar Posição",
-    Size = UDim2.new(0,280,0,40),
-    Position = UDim2.new(0,10,0,10),
-    BackgroundColor3 = Color3.fromRGB(0,200,100),
-    TextColor3 = Color3.fromRGB(255,255,255)
-})
-saveBtn.MouseButton1Click:Connect(SavePosition)
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 500, 0, 350)
+frame.Position = UDim2.new(0.5, -250, 0.5, -175)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 
-local returnBtn = Create("TextButton",{
-    Parent = frame,
-    Text = "🚀 Voltar para Posição",
-    Size = UDim2.new(0,280,0,40),
-    Position = UDim2.new(0,10,0,60),
-    BackgroundColor3 = Color3.fromRGB(0,150,255),
-    TextColor3 = Color3.fromRGB(255,255,255)
-})
-returnBtn.MouseButton1Click:Connect(ReturnPosition)
+local abaServidores = Instance.new("Frame", frame)
+abaServidores.Size = UDim2.new(1, 0, 1, 0)
+abaServidores.BackgroundTransparency = 1
 
--- ===== EXECUTA BUSCA E TELEPORTE AUTOMÁTICO =====
-task.spawn(FetchServersAndTeleport)
+local abaPosicao = Instance.new("Frame", frame)
+abaPosicao.Size = UDim2.new(1, 0, 1, 0)
+abaPosicao.Visible = false
+abaPosicao.BackgroundTransparency = 1
 
-print("✅ Script Delta carregado!")
+-- Seta para próxima aba
+local setaProxima = Instance.new("TextButton", abaServidores)
+setaProxima.Size = UDim2.new(0, 30, 0, 30)
+setaProxima.Position = UDim2.new(1, -40, 1, -40)
+setaProxima.Text = "→"
+setaProxima.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+setaProxima.MouseButton1Click:Connect(function()
+    abaServidores.Visible = false
+    abaPosicao.Visible = true
+end)
+
+-- Seta para voltar
+local setaVoltar = Instance.new("TextButton", abaPosicao)
+setaVoltar.Size = UDim2.new(0, 30, 0, 30)
+setaVoltar.Position = UDim2.new(0, 10, 1, -40)
+setaVoltar.Text = "←"
+setaVoltar.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+setaVoltar.MouseButton1Click:Connect(function()
+    abaServidores.Visible = true
+    abaPosicao.Visible = false
+end)
+
+-- Botão Salvar Posição
+local botaoSalvar = Instance.new("TextButton", abaPosicao)
+botaoSalvar.Size = UDim2.new(0, 180, 0, 40)
+botaoSalvar.Position = UDim2.new(0.5, -90, 0.3, 0)
+botaoSalvar.Text = "Salvar Posição"
+botaoSalvar.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
+botaoSalvar.MouseButton1Click:Connect(function()
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        savedPosition = player.Character.HumanoidRootPart.Position
+        botaoSalvar.Text = "Posição Salva!"
+        wait(1)
+        botaoSalvar.Text = "Salvar Posição"
+    end
+end)
+
+-- Botão Voltar
+local botaoVoltar = Instance.new("TextButton", abaPosicao)
+botaoVoltar.Size = UDim2.new(0, 180, 0, 40)
+botaoVoltar.Position = UDim2.new(0.5, -90, 0.5, 0)
+botaoVoltar.Text = "Voltar"
+botaoVoltar.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+botaoVoltar.MouseButton1Click:Connect(function()
+    if savedPosition and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.CFrame = CFrame.new(savedPosition)
+    end
+end)
+
+-- Lista de servidores
+local listaServidores = Instance.new("ScrollingFrame", abaServidores)
+listaServidores.Size = UDim2.new(1, -40, 0.7, -40)
+listaServidores.Position = UDim2.new(0, 20, 0, 20)
+listaServidores.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+listaServidores.CanvasSize = UDim2.new(0, 0, 0, 0)
+listaServidores.ScrollBarThickness = 6
+
+-- Botão Buscar Rápido
+local botaoBuscarRapido = Instance.new("TextButton", abaServidores)
+botaoBuscarRapido.Size = UDim2.new(0, 180, 0, 40)
+botaoBuscarRapido.Position = UDim2.new(0.5, -90, 0.85, 0)
+botaoBuscarRapido.Text = "Buscar Rápido"
+botaoBuscarRapido.BackgroundColor3 = Color3.fromRGB(60, 60, 180)
+
+local function atualizarServidores()
+    listaServidores:ClearAllChildren()
+    local servers = buscarServidores()
+    listaServidores.CanvasSize = UDim2.new(0, 0, 0, #servers*45)
+    for i, server in ipairs(servers) do
+        local btn = Instance.new("TextButton", listaServidores)
+        btn.Size = UDim2.new(1, -10, 0, 40)
+        btn.Position = UDim2.new(0, 5, 0, (i-1)*45)
+        btn.Text = ("Brainrots: %dm | Jogadores: %d/%d"):format(math.floor(server.brainrots/1000000), server.playerCount, server.maxPlayers)
+        btn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+        btn.MouseButton1Click:Connect(function()
+            teleportarParaServidor(server.id)
+        end)
+    end
+end
+
+botaoBuscarRapido.MouseButton1Click:Connect(function()
+    local servers = buscarServidores()
+    if #servers > 0 then
+        -- Entra no servidor com mais brainrots
+        table.sort(servers, function(a, b) return a.brainrots > b.brainrots end)
+        teleportarParaServidor(servers[1].id)
+    else
+        botaoBuscarRapido.Text = "Nenhum servidor encontrado!"
+        wait(1)
+        botaoBuscarRapido.Text = "Buscar Rápido"
+    end
+end)
+
+-- Atualiza lista ao abrir GUI
+atualizarServidores()
+
+-- Recomendo atualizar a lista a cada X segundos
+spawn(function()
+    while true do
+        wait(30)
+        if abaServidores.Visible then
+            atualizarServidores()
+        end
+    end
+end)
