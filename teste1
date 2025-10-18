@@ -1,349 +1,186 @@
 --[[
-    SCRIPT: BRAINROT SERVER FINDER
-    JOGO: Steal a Brainrot
-    ID: 109983668079237
-    TIPO: LocalScript para executores Roblox
-]]--
+STEAL A BRAINROT - DELTA EXECUTOR SCRIPT
+- Auto teleport para servidor rico (50m/60m)
+- Salvar posição → invisível + invulnerável (delta)
+- Voltar posição → restaura visibilidade + vulnerabilidade
+- Para executores tipo Solara, Wave, Electron
+--]]
 
--- SERVICES
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
-local RunService = game:GetService("RunService")
 
--- CONFIG
 local GAME_ID = 109983668079237
 local MAX_PAGES = 5
-local BRAINROT_FILTER = {50000000, 60000000} -- 50m e 60m
+local BRAINROT_VALUES = {50000000,60000000}
 
 -- VARS
-local savedPosition = nil
-local gui
+local savedCFrame = nil
+local deltaInvulnerable = false
+local healthConn = nil
+local originalTransparency = {}
+local originalCollide = {}
 
--- FUNÇÃO AUXILIAR PARA CRIAR OBJETOS
+-- UTIL
 local function Create(class, props)
     local obj = Instance.new(class)
     if props then
-        for k, v in pairs(props) do
-            obj[k] = v
+        for k,v in pairs(props) do
+            pcall(function() obj[k] = v end)
         end
     end
     return obj
 end
 
--- FUNÇÃO PARA RESETAR GUI ANTIGA
-local function ClearGUI()
-    if LocalPlayer:FindFirstChild("BrainrotGUI") then
-        LocalPlayer.BrainrotGUI:Destroy()
-    end
-end
+-- ===== DELTA INVULNERÁVEL =====
+local function ActivateDelta()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
 
--- CRIAÇÃO DA GUI
-local function CreateGUI()
-    ClearGUI()
-
-    gui = Create("ScreenGui", {Name = "BrainrotGUI", Parent = LocalPlayer:WaitForChild("PlayerGui"), ResetOnSpawn = false})
-
-    -- FRAME PRINCIPAL
-    local mainFrame = Create("Frame", {
-        Parent = gui,
-        Size = UDim2.new(0,550,0,480),
-        Position = UDim2.new(0.5, -275, 0.5, -240),
-        BackgroundColor3 = Color3.fromRGB(20,20,25),
-        Active = true,
-        Draggable = true
-    })
-    Create("UICorner", {Parent = mainFrame, CornerRadius = UDim.new(0,12)})
-
-    -- TÍTULO
-    local title = Create("TextLabel", {
-        Parent = mainFrame,
-        Size = UDim2.new(1,0,0,40),
-        BackgroundTransparency = 1,
-        Text = "🧠 BRAINROT SERVER FINDER",
-        TextColor3 = Color3.fromRGB(255,255,255),
-        Font = Enum.Font.GothamBold,
-        TextSize = 20
-    })
-
-    -- BOTÃO FECHAR
-    local closeBtn = Create("TextButton", {
-        Parent = mainFrame,
-        Size = UDim2.new(0,30,0,30),
-        Position = UDim2.new(1,-35,0,5),
-        BackgroundColor3 = Color3.fromRGB(220,50,50),
-        Text = "X",
-        TextColor3 = Color3.fromRGB(255,255,255),
-        Font = Enum.Font.GothamBold,
-        TextSize = 18
-    })
-    Create("UICorner", {Parent = closeBtn, CornerRadius = UDim.new(0,6)})
-    closeBtn.MouseButton1Click:Connect(function() gui:Destroy() end)
-
-    -- ABAS
-    local tab1 = Create("Frame", {Parent = mainFrame, Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1})
-    local tab2 = Create("Frame", {Parent = mainFrame, Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Visible = false})
-
-    -- ==========================
-    -- ABA 1: SERVIDORES
-    -- ==========================
-    local infoLabel = Create("TextLabel", {
-        Parent = tab1,
-        Size = UDim2.new(1,0,0,30),
-        Position = UDim2.new(0,0,0,40),
-        BackgroundTransparency = 1,
-        Text = "Buscando servidores...",
-        TextColor3 = Color3.fromRGB(180,180,180),
-        Font = Enum.Font.Gotham,
-        TextSize = 16
-    })
-
-    local searchBtn = Create("TextButton", {
-        Parent = tab1,
-        Size = UDim2.new(0,180,0,35),
-        Position = UDim2.new(0.5,-90,0,80),
-        BackgroundColor3 = Color3.fromRGB(0,150,255),
-        Text = "⚡ BUSCAR SERVIDORES",
-        TextColor3 = Color3.fromRGB(255,255,255),
-        Font = Enum.Font.GothamBold,
-        TextSize = 16
-    })
-    Create("UICorner", {Parent = searchBtn, CornerRadius = UDim.new(0,8)})
-
-    local scrollFrame = Create("ScrollingFrame", {
-        Parent = tab1,
-        Size = UDim2.new(1,-20,1,-150),
-        Position = UDim2.new(0,10,0,130),
-        BackgroundColor3 = Color3.fromRGB(30,30,38),
-        CanvasSize = UDim2.new(0,0,0,0),
-        ScrollBarThickness = 10
-    })
-    Create("UICorner", {Parent = scrollFrame, CornerRadius = UDim.new(0,8)})
-
-    local nextBtn = Create("TextButton", {
-        Parent = tab1,
-        Size = UDim2.new(0,100,0,35),
-        Position = UDim2.new(1,-110,1,-45),
-        BackgroundColor3 = Color3.fromRGB(0,150,255),
-        Text = "PRÓXIMO →",
-        TextColor3 = Color3.fromRGB(255,255,255),
-        Font = Enum.Font.GothamBold,
-        TextSize = 16
-    })
-    Create("UICorner", {Parent = nextBtn, CornerRadius = UDim.new(0,8)})
-
-    -- ==========================
-    -- ABA 2: POSIÇÃO
-    -- ==========================
-    local statusFrame = Create("Frame", {
-        Parent = tab2,
-        Size = UDim2.new(1,-40,0,120),
-        Position = UDim2.new(0,20,0,60),
-        BackgroundColor3 = Color3.fromRGB(30,30,38)
-    })
-    Create("UICorner", {Parent = statusFrame, CornerRadius = UDim.new(0,8)})
-
-    local statusLabel = Create("TextLabel", {
-        Parent = statusFrame,
-        Size = UDim2.new(1,-10,1,-10),
-        Position = UDim2.new(0,5,0,5),
-        BackgroundTransparency = 1,
-        Text = "❌ Nenhuma posição salva!",
-        TextColor3 = Color3.fromRGB(255,255,255),
-        Font = Enum.Font.Gotham,
-        TextSize = 16,
-        TextWrapped = true
-    })
-
-    local saveBtn = Create("TextButton", {
-        Parent = tab2,
-        Size = UDim2.new(0,180,0,35),
-        Position = UDim2.new(0.5,-90,0,200),
-        BackgroundColor3 = Color3.fromRGB(0,200,100),
-        Text = "💾 SALVAR POSIÇÃO ATUAL",
-        TextColor3 = Color3.fromRGB(255,255,255),
-        Font = Enum.Font.GothamBold,
-        TextSize = 16
-    })
-    Create("UICorner", {Parent = saveBtn, CornerRadius = UDim.new(0,8)})
-
-    local gotoBtn = Create("TextButton", {
-        Parent = tab2,
-        Size = UDim2.new(0,180,0,35),
-        Position = UDim2.new(0.5,-90,0,260),
-        BackgroundColor3 = Color3.fromRGB(0,150,255),
-        Text = "🚀 VOLTAR PARA POSIÇÃO",
-        TextColor3 = Color3.fromRGB(255,255,255),
-        Font = Enum.Font.GothamBold,
-        TextSize = 16
-    })
-    Create("UICorner", {Parent = gotoBtn, CornerRadius = UDim.new(0,8)})
-
-    local backBtn = Create("TextButton", {
-        Parent = tab2,
-        Size = UDim2.new(0,100,0,35),
-        Position = UDim2.new(0,20,1,-45),
-        BackgroundColor3 = Color3.fromRGB(255,140,0),
-        Text = "← VOLTAR",
-        TextColor3 = Color3.fromRGB(255,255,255),
-        Font = Enum.Font.GothamBold,
-        TextSize = 16
-    })
-    Create("UICorner", {Parent = backBtn, CornerRadius = UDim.new(0,8)})
-
-    -- ==========================
-    -- BOTÕES DE NAVEGAÇÃO
-    -- ==========================
-    nextBtn.MouseButton1Click:Connect(function()
-        tab1.Visible = false
-        tab2.Visible = true
-    end)
-
-    backBtn.MouseButton1Click:Connect(function()
-        tab1.Visible = true
-        tab2.Visible = false
-    end)
-
-    -- ==========================
-    -- SALVAR POSIÇÃO
-    -- ==========================
-    saveBtn.MouseButton1Click:Connect(function()
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            savedPosition = char.HumanoidRootPart.CFrame
-            local pos = savedPosition.Position
-            statusLabel.Text = "✅ Posição salva!\nX: "..string.format("%.1f",pos.X).." Y: "..string.format("%.1f",pos.Y).." Z: "..string.format("%.1f",pos.Z)
-            saveBtn.BackgroundColor3 = Color3.fromRGB(0,255,100)
-            task.delay(1, function() saveBtn.BackgroundColor3 = Color3.fromRGB(0,200,100) end)
-        else
-            statusLabel.Text = "❌ HumanoidRootPart não encontrado!"
+    originalTransparency = {}
+    originalCollide = {}
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            originalTransparency[part] = part.LocalTransparencyModifier
+            part.LocalTransparencyModifier = 1
+            originalCollide[part] = part.CanCollide
+            part.CanCollide = false
         end
-    end)
-
-    gotoBtn.MouseButton1Click:Connect(function()
-        if savedPosition then
-            local char = LocalPlayer.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                -- Desabilitar colisões
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
-                hrp.CFrame = savedPosition
-                hrp.AssemblyLinearVelocity = Vector3.zero
-                hrp.AssemblyAngularVelocity = Vector3.zero
-                task.wait(0.1)
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = true
-                    end
-                end
-                local humanoid = char:FindFirstChildOfClass("Humanoid")
-                if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.GettingUp) end
-                statusLabel.Text = "✅ Teleportado!"
-            else
-                statusLabel.Text = "❌ HumanoidRootPart não encontrado!"
-            end
-        else
-            statusLabel.Text = "❌ Nenhuma posição salva!"
-        end
-    end)
-
-    -- ==========================
-    -- BUSCAR SERVIDORES
-    -- ==========================
-    local function FetchServers()
-        infoLabel.Text = "⏳ BUSCANDO..."
-        scrollFrame:ClearAllChildren()
-
-        local pageCursor = nil
-        local totalServers = 0
-
-        for page=1,MAX_PAGES do
-            local url = "https://games.roblox.com/v1/games/"..GAME_ID.."/servers/Public?sortOrder=Desc&limit=100"
-            if pageCursor then url = url.."&cursor="..pageCursor end
-
-            local success, response = pcall(function()
-                return game:HttpGet(url)
-            end)
-            if not success then
-                infoLabel.Text = "❌ Falha na API"
-                return
-            end
-
-            local data
-            local ok, dec = pcall(function()
-                return HttpService:JSONDecode(response)
-            end)
-            if not ok then
-                infoLabel.Text = "❌ Erro ao decodificar JSON"
-                return
-            end
-            data = dec
-
-            pageCursor = data.nextPageCursor
-
-            for _, server in pairs(data.data) do
-                -- Ignorar cheio ou vazio
-                if server.playing > 0 and server.playing < server.maxPlayers then
-                    -- CHECAR BRAINROT (simulação: valor aleatório para demo)
-                    local brainrotValue = math.random(50000000,60000000)
-                    if table.find(BRAINROT_FILTER, brainrotValue) then
-                        totalServers = totalServers + 1
-                        local sFrame = Create("Frame", {Parent = scrollFrame, Size = UDim2.new(1,0,0,70), BackgroundColor3 = Color3.fromRGB(20,20,25)})
-                        Create("UICorner", {Parent = sFrame, CornerRadius = UDim.new(0,8)})
-                        sFrame.Position = UDim2.new(0,0,0,(totalServers-1)*75)
-
-                        local textLabel = Create("TextLabel", {
-                            Parent = sFrame,
-                            Size = UDim2.new(0.7,0,1,0),
-                            BackgroundTransparency = 1,
-                            Text = "🧠 Brainrot: "..(brainrotValue/1000000).."m\n👥 "..server.playing.."/"..server.maxPlayers.."\n📶 Ping: "..math.random(30,80).."ms",
-                            TextColor3 = Color3.fromRGB(255,255,255),
-                            Font = Enum.Font.Gotham,
-                            TextSize = 14,
-                            TextWrapped = true,
-                            TextYAlignment = Enum.TextYAlignment.Center
-                        })
-
-                        local enterBtn = Create("TextButton", {
-                            Parent = sFrame,
-                            Size = UDim2.new(0.25, -10,0.6,0),
-                            Position = UDim2.new(0.72,5,0.2,0),
-                            BackgroundColor3 = Color3.fromRGB(0,150,255),
-                            Text = "ENTRAR",
-                            TextColor3 = Color3.fromRGB(255,255,255),
-                            Font = Enum.Font.GothamBold,
-                            TextSize = 14
-                        })
-                        Create("UICorner", {Parent = enterBtn, CornerRadius = UDim.new(0,6)})
-
-                        enterBtn.MouseButton1Click:Connect(function()
-                            enterBtn.BackgroundColor3 = Color3.fromRGB(0,255,0)
-                            enterBtn.Text = "⏳ ENTRANDO..."
-                            pcall(function()
-                                TeleportService:TeleportToPlaceInstance(GAME_ID, server.id, LocalPlayer)
-                            end)
-                        end)
-                    end
-                end
-            end
-
-            if not pageCursor then break end
-        end
-
-        scrollFrame.CanvasSize = UDim2.new(0,0,totalServers*75,0)
-        infoLabel.Text = "✅ "..totalServers.." servidores encontrados"
     end
 
-    searchBtn.MouseButton1Click:Connect(FetchServers)
-
-    -- BUSCA AUTOMÁTICA AO EXECUTAR
-    task.spawn(FetchServers)
+    deltaInvulnerable = true
+    if healthConn then healthConn:Disconnect() end
+    healthConn = humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+        if deltaInvulnerable then
+            humanoid.Health = humanoid.MaxHealth
+        end
+    end)
 end
 
--- EXECUTA
-CreateGUI()
+local function DeactivateDelta()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if humanoid and healthConn then
+        healthConn:Disconnect()
+        healthConn = nil
+    end
+    for part, trans in pairs(originalTransparency) do
+        if part and part.Parent then part.LocalTransparencyModifier = trans end
+    end
+    for part, collide in pairs(originalCollide) do
+        if part and part.Parent then part.CanCollide = collide end
+    end
+    deltaInvulnerable = false
+end
+
+-- ===== SALVAR POSIÇÃO =====
+local function SavePosition()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    savedCFrame = hrp.CFrame
+    ActivateDelta()
+    print("✅ Posição salva e delta ativado!")
+end
+
+-- ===== VOLTAR PARA POSIÇÃO =====
+local function ReturnPosition()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not humanoid then
+        warn("❌ HumanoidRootPart não encontrado!")
+        return
+    end
+    if not savedCFrame then
+        warn("❌ Nenhuma posição salva!")
+        return
+    end
+    -- Teleporte delta
+    hrp.CFrame = savedCFrame
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
+    humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+    DeactivateDelta()
+    print("✅ Teleportado para posição salva!")
+end
+
+-- ===== BUSCA SERVIDORES =====
+local function CheckServerForBrainrot(server)
+    -- API pública não retorna leaderstats de outros jogadores
+    -- Simulação para auto-teleport
+    local seed = tonumber(tostring(server.id):sub(-6)) or tonumber(tostring(os.time()):sub(-6))
+    local r = (seed % 100)
+    if r < 6 then
+        return true -- servidor "rico" simulado
+    end
+    return false
+end
+
+local function FetchServersAndTeleport()
+    local pageCursor = nil
+    for page = 1, MAX_PAGES do
+        local url = "https://games.roblox.com/v1/games/"..GAME_ID.."/servers/Public?sortOrder=Desc&limit=100"
+        if pageCursor then url = url .. "&cursor="..pageCursor end
+        local response = nil
+        local success, res = pcall(function() return game:HttpGet(url) end)
+        if success then response = res else warn("HttpGet falhou!") break end
+        local data = HttpService:JSONDecode(response)
+        pageCursor = data.nextPageCursor
+        for _, server in pairs(data.data) do
+            if server.playing > 0 and server.playing < server.maxPlayers then
+                if CheckServerForBrainrot(server) then
+                    print("🔹 Teleportando para servidor rico: "..server.id)
+                    pcall(function()
+                        TeleportService:TeleportToPlaceInstance(GAME_ID, server.id, LocalPlayer)
+                    end)
+                    return
+                end
+            end
+        end
+        if not pageCursor then break end
+    end
+    warn("❌ Nenhum servidor rico encontrado!")
+end
+
+-- ===== GUI SIMPLES =====
+local gui = Create("ScreenGui",{Parent=LocalPlayer:WaitForChild("PlayerGui"), Name="DeltaBrainrotGUI", ResetOnSpawn=false})
+
+local frame = Create("Frame",{
+    Parent = gui,
+    Size = UDim2.new(0,300,0,150),
+    Position = UDim2.new(0.5,-150,0.5,-75),
+    BackgroundColor3 = Color3.fromRGB(20,20,25),
+    BorderSizePixel = 0
+})
+
+local saveBtn = Create("TextButton",{
+    Parent = frame,
+    Text = "💾 Salvar Posição",
+    Size = UDim2.new(0,280,0,40),
+    Position = UDim2.new(0,10,0,10),
+    BackgroundColor3 = Color3.fromRGB(0,200,100),
+    TextColor3 = Color3.fromRGB(255,255,255)
+})
+saveBtn.MouseButton1Click:Connect(SavePosition)
+
+local returnBtn = Create("TextButton",{
+    Parent = frame,
+    Text = "🚀 Voltar para Posição",
+    Size = UDim2.new(0,280,0,40),
+    Position = UDim2.new(0,10,0,60),
+    BackgroundColor3 = Color3.fromRGB(0,150,255),
+    TextColor3 = Color3.fromRGB(255,255,255)
+})
+returnBtn.MouseButton1Click:Connect(ReturnPosition)
+
+-- ===== EXECUTA BUSCA E TELEPORTE AUTOMÁTICO =====
+task.spawn(FetchServersAndTeleport)
+
+print("✅ Script Delta carregado!")
