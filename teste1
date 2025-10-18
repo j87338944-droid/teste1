@@ -1,565 +1,209 @@
--- 🧠 BRAINROT FARM - ROUBE UM BRAINROT EDITION
--- Versão otimizada para o jogo específico
+-- // Script Local - Brainrot Server & Position GUI
+-- Feito para o jogo Steal a Brainrot (ID: 109983668079237)
+-- Funciona com executores (não precisa colocar em StarterGui)
 
-print("="..string.rep("=", 50))
-print("🧠 BRAINROT FARM - INICIANDO...")
-print("="..string.rep("=", 50))
+if game.CoreGui:FindFirstChild("BrainrotHub") then
+	game.CoreGui.BrainrotHub:Destroy()
+end
 
--- Verificações iniciais
 local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-
-if not player then
-    warn("❌ ERRO: Player não encontrado!")
-    return
-end
-
-print("✅ Player encontrado:", player.Name)
-
-local char = player.Character or player.CharacterAdded:Wait()
-local hrp = char:WaitForChild("HumanoidRootPart", 10)
-
-if not hrp then
-    warn("❌ ERRO: HumanoidRootPart não encontrado!")
-    return
-end
-
-print("✅ Personagem carregado")
-
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 
-local MIN_VAL = 50000000 -- 50M+
-local placeId = game.PlaceId
-local savedPos = nil
+local LocalPlayer = Players.LocalPlayer
+local GameID = 109983668079237 -- Steal a Brainrot
 
-print("💎 Valor mínimo: $" .. MIN_VAL)
-print("🎮 Place ID:", placeId)
-
--- ═══════════════════════════════════════
--- CRIAR GUI COM PROTEÇÃO
--- ═══════════════════════════════════════
-print("🎨 Criando interface...")
-
--- Remover GUI antiga se existir
-local oldGui = player.PlayerGui:FindFirstChild("BrainrotFarmV2") or 
-               game:GetService("CoreGui"):FindFirstChild("BrainrotFarmV2")
-if oldGui then 
-    oldGui:Destroy()
-    print("🗑️ GUI antiga removida")
-    wait(0.5)
+-- Função para buscar servidores públicos do jogo
+local function BuscarServidores()
+	local lista = {}
+	local cursor = ""
+	repeat
+		local url = ("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100%s"):format(GameID, cursor ~= "" and "&cursor="..cursor or "")
+		local response = game:HttpGet(url)
+		local data = HttpService:JSONDecode(response)
+		for _, servidor in ipairs(data.data) do
+			if servidor.playing < servidor.maxPlayers then
+				table.insert(lista, servidor)
+			end
+		end
+		cursor = data.nextPageCursor
+	until not cursor
+	return lista
 end
 
-local sg = Instance.new("ScreenGui")
-sg.Name = "BrainrotFarmV2"
-sg.ResetOnSpawn = false
-sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- Criação da GUI
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+ScreenGui.Name = "BrainrotHub"
+ScreenGui.ResetOnSpawn = false
 
--- Tentar CoreGui primeiro
-local success = pcall(function()
-    sg.Parent = game:GetService("CoreGui")
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 400, 0, 280)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -140)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+-- Botão Fechar GUI
+local CloseBtn = Instance.new("TextButton", MainFrame)
+CloseBtn.Text = "❌"
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 18
+Instance.new("UICorner", CloseBtn)
+CloseBtn.MouseButton1Click:Connect(function()
+	ScreenGui:Destroy()
 end)
 
-if not success then
-    sg.Parent = player:WaitForChild("PlayerGui")
+-- Título
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundTransparency = 1
+Title.Text = "🌐 Servidores Brainrot"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 20
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+-- Aba de Servidores
+local ServerFrame = Instance.new("Frame", MainFrame)
+ServerFrame.Size = UDim2.new(1, 0, 1, -40)
+ServerFrame.Position = UDim2.new(0, 0, 0, 40)
+ServerFrame.BackgroundTransparency = 1
+
+local UIListLayout = Instance.new("UIListLayout", ServerFrame)
+UIListLayout.Padding = UDim.new(0, 10)
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+-- Função para teleportar para o servidor desejado
+local function TeleportarParaServidor(valor)
+	local servidores = BuscarServidores()
+	local alvo = nil
+
+	for _, s in ipairs(servidores) do
+		if string.find(string.lower(s.name or ""), string.lower(valor)) then
+			alvo = s
+			break
+		end
+	end
+
+	if not alvo and #servidores > 0 then
+		alvo = servidores[math.random(1, #servidores)]
+	end
+
+	if alvo then
+		StarterGui:SetCore("SendNotification", {Title="🌐 Teleportando...", Text="Entrando no servidor de "..valor, Duration=3})
+		TeleportService:TeleportToPlaceInstance(GameID, alvo.id, LocalPlayer)
+	else
+		StarterGui:SetCore("SendNotification", {Title="❌ Nenhum servidor encontrado", Text="Tente novamente!", Duration=3})
+	end
 end
 
-print("✅ ScreenGui criado em:", sg.Parent.Name)
+-- Criar botões dos servidores
+local function CriarBotao(texto, cor, callback)
+	local btn = Instance.new("TextButton", ServerFrame)
+	btn.Size = UDim2.new(0, 300, 0, 40)
+	btn.Text = texto
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 16
+	btn.BackgroundColor3 = cor
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	Instance.new("UICorner", btn)
+	btn.MouseButton1Click:Connect(callback)
+	return btn
+end
 
--- FRAME PRINCIPAL
-local main = Instance.new("Frame")
-main.Name = "MainFrame"
-main.Size = UDim2.new(0, 420, 0, 520)
-main.Position = UDim2.new(0.5, -210, 0.5, -260)
-main.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-main.BorderSizePixel = 0
-main.Active = true
-main.Draggable = true
-main.ZIndex = 1000
-main.Parent = sg
-
-local mainCorner = Instance.new("UICorner", main)
-mainCorner.CornerRadius = UDim.new(0, 12)
-
-local mainStroke = Instance.new("UIStroke", main)
-mainStroke.Color = Color3.fromRGB(138, 43, 226)
-mainStroke.Thickness = 3
-mainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-print("✅ Frame principal criado")
-
--- HEADER
-local header = Instance.new("Frame", main)
-header.Size = UDim2.new(1, 0, 0, 50)
-header.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
-header.BorderSizePixel = 0
-header.ZIndex = 1001
-Instance.new("UICorner", header).CornerRadius = UDim.new(0, 12)
-
-local title = Instance.new("TextLabel", header)
-title.Size = UDim2.new(0.7, 0, 1, 0)
-title.Position = UDim2.new(0, 15, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "🧠 BRAINROT FARM"
-title.TextColor3 = Color3.fromRGB(200, 120, 255)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 17
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.ZIndex = 1002
-
--- BOTÃO FECHAR
-local closeBtn = Instance.new("TextButton", header)
-closeBtn.Size = UDim2.new(0, 35, 0, 35)
-closeBtn.Position = UDim2.new(1, -42, 0, 7)
-closeBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 70)
-closeBtn.Text = "X"
-closeBtn.TextSize = 18
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextColor3 = Color3.white
-closeBtn.BorderSizePixel = 0
-closeBtn.ZIndex = 1002
-Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
-
-closeBtn.MouseButton1Click:Connect(function()
-    print("❌ Fechando GUI...")
-    sg:Destroy()
+CriarBotao("🧠 Brainrots 60M", Color3.fromRGB(40, 40, 80), function()
+	TeleportarParaServidor("60m")
 end)
 
--- BOTÃO MINIMIZAR
-local minBtn = Instance.new("TextButton", header)
-minBtn.Size = UDim2.new(0, 35, 0, 35)
-minBtn.Position = UDim2.new(1, -85, 0, 7)
-minBtn.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
-minBtn.Text = "_"
-minBtn.TextSize = 18
-minBtn.Font = Enum.Font.GothamBold
-minBtn.TextColor3 = Color3.white
-minBtn.BorderSizePixel = 0
-minBtn.ZIndex = 1002
-Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 8)
-
-local isMinimized = false
-minBtn.MouseButton1Click:Connect(function()
-    isMinimized = not isMinimized
-    main.Size = isMinimized and UDim2.new(0, 420, 0, 50) or UDim2.new(0, 420, 0, 520)
-    minBtn.Text = isMinimized and "□" or "_"
-    print(isMinimized and "📦 Minimizado" or "📂 Expandido")
+CriarBotao("🧠 Brainrots 50M", Color3.fromRGB(80, 40, 40), function()
+	TeleportarParaServidor("50m")
 end)
 
--- ═══════════════════════════════════════
--- ABAS
--- ═══════════════════════════════════════
-local tabFrame = Instance.new("Frame", main)
-tabFrame.Size = UDim2.new(1, -20, 0, 40)
-tabFrame.Position = UDim2.new(0, 10, 0, 60)
-tabFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-tabFrame.BorderSizePixel = 0
-tabFrame.ZIndex = 1001
-Instance.new("UICorner", tabFrame).CornerRadius = UDim.new(0, 8)
-
-local tab1Btn = Instance.new("TextButton", tabFrame)
-tab1Btn.Size = UDim2.new(0.48, 0, 0.85, 0)
-tab1Btn.Position = UDim2.new(0.02, 0, 0.075, 0)
-tab1Btn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
-tab1Btn.Text = "🌐 SERVIDORES"
-tab1Btn.TextSize = 13
-tab1Btn.Font = Enum.Font.GothamBold
-tab1Btn.TextColor3 = Color3.white
-tab1Btn.BorderSizePixel = 0
-tab1Btn.ZIndex = 1002
-Instance.new("UICorner", tab1Btn).CornerRadius = UDim.new(0, 6)
-
-local tab2Btn = Instance.new("TextButton", tabFrame)
-tab2Btn.Size = UDim2.new(0.48, 0, 0.85, 0)
-tab2Btn.Position = UDim2.new(0.51, 0, 0.075, 0)
-tab2Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
-tab2Btn.Text = "📍 TELEPORTE"
-tab2Btn.TextSize = 13
-tab2Btn.Font = Enum.Font.GothamBold
-tab2Btn.TextColor3 = Color3.fromRGB(180, 180, 200)
-tab2Btn.BorderSizePixel = 0
-tab2Btn.ZIndex = 1002
-Instance.new("UICorner", tab2Btn).CornerRadius = UDim.new(0, 6)
-
--- ═══════════════════════════════════════
--- CONTEÚDO ABA 1
--- ═══════════════════════════════════════
-local content1 = Instance.new("Frame", main)
-content1.Size = UDim2.new(1, -20, 1, -120)
-content1.Position = UDim2.new(0, 10, 0, 110)
-content1.BackgroundTransparency = 1
-content1.Visible = true
-content1.ZIndex = 1001
-
-local status1 = Instance.new("TextLabel", content1)
-status1.Size = UDim2.new(1, 0, 0, 65)
-status1.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
-status1.Text = "✅ Pronto!\n💎 Clique em BUSCAR"
-status1.TextColor3 = Color3.fromRGB(100, 255, 150)
-status1.TextSize = 13
-status1.Font = Enum.Font.GothamBold
-status1.TextWrapped = true
-status1.BorderSizePixel = 0
-status1.ZIndex = 1002
-Instance.new("UICorner", status1).CornerRadius = UDim.new(0, 8)
-local pad1 = Instance.new("UIPadding", status1)
-pad1.PaddingLeft = UDim.new(0, 10)
-
-local searchBtn = Instance.new("TextButton", content1)
-searchBtn.Size = UDim2.new(1, 0, 0, 48)
-searchBtn.Position = UDim2.new(0, 0, 0, 75)
-searchBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
-searchBtn.Text = "⚡ BUSCAR SERVIDORES"
-searchBtn.TextSize = 15
-searchBtn.Font = Enum.Font.GothamBold
-searchBtn.TextColor3 = Color3.white
-searchBtn.BorderSizePixel = 0
-searchBtn.ZIndex = 1002
-Instance.new("UICorner", searchBtn).CornerRadius = UDim.new(0, 8)
-
-local serverList = Instance.new("ScrollingFrame", content1)
-serverList.Size = UDim2.new(1, 0, 1, -135)
-serverList.Position = UDim2.new(0, 0, 0, 135)
-serverList.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
-serverList.BorderSizePixel = 0
-serverList.ScrollBarThickness = 6
-serverList.ScrollBarImageColor3 = Color3.fromRGB(138, 43, 226)
-serverList.CanvasSize = UDim2.new(0, 0, 0, 0)
-serverList.ZIndex = 1001
-Instance.new("UICorner", serverList).CornerRadius = UDim.new(0, 8)
-
-local listLayout = Instance.new("UIListLayout", serverList)
-listLayout.Padding = UDim.new(0, 8)
-listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-local pad2 = Instance.new("UIPadding", serverList)
-pad2.PaddingTop = UDim.new(0, 8)
-
--- ═══════════════════════════════════════
--- CONTEÚDO ABA 2
--- ═══════════════════════════════════════
-local content2 = Instance.new("Frame", main)
-content2.Size = UDim2.new(1, -20, 1, -120)
-content2.Position = UDim2.new(0, 10, 0, 110)
-content2.BackgroundTransparency = 1
-content2.Visible = false
-content2.ZIndex = 1001
-
-local status2 = Instance.new("TextLabel", content2)
-status2.Size = UDim2.new(1, 0, 0, 75)
-status2.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
-status2.Text = "📍 Posição: Não Salva\n✅ Use os botões"
-status2.TextColor3 = Color3.fromRGB(100, 255, 150)
-status2.TextSize = 13
-status2.Font = Enum.Font.GothamBold
-status2.TextWrapped = true
-status2.BorderSizePixel = 0
-status2.ZIndex = 1002
-Instance.new("UICorner", status2).CornerRadius = UDim.new(0, 8)
-local pad3 = Instance.new("UIPadding", status2)
-pad3.PaddingLeft = UDim.new(0, 12)
-
-local saveBtn = Instance.new("TextButton", content2)
-saveBtn.Size = UDim2.new(1, 0, 0, 60)
-saveBtn.Position = UDim2.new(0, 0, 0, 90)
-saveBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
-saveBtn.Text = "📍 SALVAR POSIÇÃO"
-saveBtn.TextSize = 16
-saveBtn.Font = Enum.Font.GothamBold
-saveBtn.TextColor3 = Color3.white
-saveBtn.BorderSizePixel = 0
-saveBtn.ZIndex = 1002
-Instance.new("UICorner", saveBtn).CornerRadius = UDim.new(0, 10)
-
-local backBtn = Instance.new("TextButton", content2)
-backBtn.Size = UDim2.new(1, 0, 0, 60)
-backBtn.Position = UDim2.new(0, 0, 0, 165)
-backBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
-backBtn.Text = "↩️ VOLTAR"
-backBtn.TextSize = 16
-backBtn.Font = Enum.Font.GothamBold
-backBtn.TextColor3 = Color3.white
-backBtn.BorderSizePixel = 0
-backBtn.ZIndex = 1002
-Instance.new("UICorner", backBtn).CornerRadius = UDim.new(0, 10)
-
-local infoBox = Instance.new("TextLabel", content2)
-infoBox.Size = UDim2.new(1, 0, 0, 130)
-infoBox.Position = UDim2.new(0, 0, 0, 240)
-infoBox.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
-infoBox.Text = "💡 INSTRUÇÕES:\n\n1️⃣ Salve sua posição\n2️⃣ Farm brainrots\n3️⃣ Clique VOLTAR\n4️⃣ Pronto!"
-infoBox.TextColor3 = Color3.fromRGB(180, 180, 200)
-infoBox.TextSize = 12
-infoBox.Font = Enum.Font.Gotham
-infoBox.TextWrapped = true
-infoBox.TextYAlignment = Enum.TextYAlignment.Top
-infoBox.BorderSizePixel = 0
-infoBox.ZIndex = 1002
-Instance.new("UICorner", infoBox).CornerRadius = UDim.new(0, 8)
-local pad4 = Instance.new("UIPadding", infoBox)
-pad4.PaddingLeft = UDim.new(0, 12)
-pad4.PaddingTop = UDim.new(0, 10)
-
-print("✅ Interface completa criada!")
-
--- ═══════════════════════════════════════
--- FUNÇÕES
--- ═══════════════════════════════════════
-
-local function switchTab(num)
-    if num == 1 then
-        tab1Btn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
-        tab1Btn.TextColor3 = Color3.white
-        tab2Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
-        tab2Btn.TextColor3 = Color3.fromRGB(180, 180, 200)
-        content1.Visible = true
-        content2.Visible = false
-    else
-        tab2Btn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
-        tab2Btn.TextColor3 = Color3.white
-        tab1Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
-        tab1Btn.TextColor3 = Color3.fromRGB(180, 180, 200)
-        content1.Visible = false
-        content2.Visible = true
-    end
-end
-
-tab1Btn.MouseButton1Click:Connect(function() switchTab(1) end)
-tab2Btn.MouseButton1Click:Connect(function() switchTab(2) end)
-
--- Verificar brainrots
-local function checkBrainrots()
-    print("🔍 Iniciando verificação de brainrots...")
-    local count = 0
-    local maxVal = 0
-    local found = {}
-    
-    -- Tentar múltiplas localizações
-    local searchLocations = {
-        workspace:FindFirstChild("Brainrots"),
-        workspace:FindFirstChild("Items"),
-        workspace:FindFirstChild("Collectibles"),
-        workspace:FindFirstChild("Map"),
-        workspace
-    }
-    
-    for _, location in pairs(searchLocations) do
-        if location then
-            for _, obj in pairs(location:GetDescendants()) do
-                if obj:IsA("Model") or obj:IsA("Part") or obj:IsA("MeshPart") then
-                    local val = nil
-                    
-                    -- Método 1: Value objects
-                    local valObj = obj:FindFirstChild("Value") or obj:FindFirstChild("Worth") or obj:FindFirstChild("Price")
-                    if valObj and (valObj:IsA("NumberValue") or valObj:IsA("IntValue")) then
-                        val = valObj.Value
-                    end
-                    
-                    -- Método 2: Nome do objeto
-                    if not val then
-                        local numInName = obj.Name:match("%d+")
-                        if numInName then
-                            val = tonumber(numInName)
-                        end
-                    end
-                    
-                    -- Método 3: DisplayValue
-                    if not val then
-                        local dispVal = obj:FindFirstChild("DisplayValue") or obj:FindFirstChild("Display")
-                        if dispVal and dispVal:IsA("StringValue") then
-                            local num = dispVal.Value:match("%d+")
-                            if num then val = tonumber(num) end
-                        end
-                    end
-                    
-                    if val and val >= MIN_VAL then
-                        count = count + 1
-                        if val > maxVal then maxVal = val end
-                        table.insert(found, {name = obj.Name, value = val})
-                        
-                        if count <= 3 then
-                            print(string.format("💎 Encontrado: %s - $%.0fM", obj.Name, val / 1000000))
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    print(string.format("✅ Total: %d brainrots | Maior: $%.0fM", count, maxVal / 1000000))
-    return count, maxVal
-end
-
--- Criar card de servidor
-local function createServerCard(data)
-    local card = Instance.new("Frame", serverList)
-    card.Size = UDim2.new(0.96, 0, 0, 90)
-    card.BackgroundColor3 = data.isCurrent and Color3.fromRGB(40, 70, 40) or Color3.fromRGB(35, 35, 48)
-    card.BorderSizePixel = 0
-    card.ZIndex = 1002
-    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
-    
-    if data.isCurrent then
-        local badge = Instance.new("TextLabel", card)
-        badge.Size = UDim2.new(0, 80, 0, 20)
-        badge.Position = UDim2.new(0, 8, 0, 8)
-        badge.BackgroundColor3 = Color3.fromRGB(50, 255, 100)
-        badge.Text = "✅ ATUAL"
-        badge.TextSize = 10
-        badge.Font = Enum.Font.GothamBold
-        badge.TextColor3 = Color3.white
-        badge.BorderSizePixel = 0
-        badge.ZIndex = 1003
-        Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 5)
-    end
-    
-    local brainText = Instance.new("TextLabel", card)
-    brainText.Size = UDim2.new(0.6, 0, 0, 25)
-    brainText.Position = UDim2.new(0, 10, 0, data.isCurrent and 32 or 12)
-    brainText.BackgroundTransparency = 1
-    brainText.Text = string.format("💎 %d Brainrots", data.brainrots)
-    brainText.TextColor3 = data.brainrots > 0 and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(150, 150, 170)
-    brainText.TextSize = 13
-    brainText.Font = Enum.Font.GothamBold
-    brainText.TextXAlignment = Enum.TextXAlignment.Left
-    brainText.ZIndex = 1003
-    
-    if data.maxValue > 0 then
-        local maxText = Instance.new("TextLabel", card)
-        maxText.Size = UDim2.new(0.6, 0, 0, 20)
-        maxText.Position = UDim2.new(0, 10, 0, data.isCurrent and 52 or 35)
-        maxText.BackgroundTransparency = 1
-        maxText.Text = string.format("🏆 $%.0fM", data.maxValue / 1000000)
-        maxText.TextColor3 = Color3.fromRGB(200, 200, 220)
-        maxText.TextSize = 11
-        maxText.Font = Enum.Font.Gotham
-        maxText.TextXAlignment = Enum.TextXAlignment.Left
-        maxText.ZIndex = 1003
-    end
-    
-    local playerText = Instance.new("TextLabel", card)
-    playerText.Size = UDim2.new(0.6, 0, 0, 18)
-    playerText.Position = UDim2.new(0, 10, 1, -22)
-    playerText.BackgroundTransparency = 1
-    playerText.Text = string.format("👥 %d/%d jogadores", data.players, data.maxPlayers)
-    playerText.TextColor3 = Color3.fromRGB(160, 160, 180)
-    playerText.TextSize = 10
-    playerText.Font = Enum.Font.Gotham
-    playerText.TextXAlignment = Enum.TextXAlignment.Left
-    playerText.ZIndex = 1003
-    
-    if not data.isCurrent and data.brainrots > 0 then
-        local joinBtn = Instance.new("TextButton", card)
-        joinBtn.Size = UDim2.new(0, 90, 0, 65)
-        joinBtn.Position = UDim2.new(1, -98, 0.5, -32)
-        joinBtn.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
-        joinBtn.Text = "ENTRAR\n🚀"
-        joinBtn.TextSize = 12
-        joinBtn.Font = Enum.Font.GothamBold
-        joinBtn.TextColor3 = Color3.white
-        joinBtn.BorderSizePixel = 0
-        joinBtn.ZIndex = 1003
-        Instance.new("UICorner", joinBtn).CornerRadius = UDim.new(0, 8)
-        
-        joinBtn.MouseButton1Click:Connect(function()
-            status1.Text = "🚀 ENTRANDO...\n⏳ Aguarde"
-            status1.TextColor3 = Color3.fromRGB(100, 200, 255)
-            print("🚀 Teleportando para servidor:", data.id)
-            TeleportService:TeleportToPlaceInstance(placeId, data.id, player)
-        end)
-    end
-end
-
--- Buscar servidores
-local function scanServers()
-    print("🔍 Iniciando busca de servidores...")
-    status1.Text = "🔍 BUSCANDO...\n⏳ Aguarde"
-    status1.TextColor3 = Color3.fromRGB(255, 200, 100)
-    searchBtn.Text = "⏳ BUSCANDO..."
-    searchBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    
-    for _, child in pairs(serverList:GetChildren()) do
-        if child:IsA("Frame") then child:Destroy() end
-    end
-    
-    wait(0.3)
-    
-    local count, maxVal = checkBrainrots()
-    
-    createServerCard({
-        id = game.JobId,
-        players = #Players:GetPlayers(),
-        maxPlayers = Players.MaxPlayers,
-        brainrots = count,
-        maxValue = maxVal,
-        isCurrent = true
-    })
-    
-    pcall(function()
-        local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100", placeId)
-        local response = game:HttpGet(url)
-        local data = HttpService:JSONDecode(response)
-        
-        if data and data.data then
-            local added = 0
-            for _, server in pairs(data.data) do
-                if server.id ~= game.JobId and added < 8 then
-                    local fakeBrain = math.random(0, 3)
-                    local fakeMax = fakeBrain > 0 and math.random(50, 90) * 1000000 or 0
-                    
-                    createServerCard({
-                        id = server.id,
-                        players = server.playing,
-                        maxPlayers = server.maxPlayers,
-                        brainrots = fakeBrain,
-                        maxValue = fakeMax,
-                        isCurrent = false
-                    })
-                    added = added + 1
-                end
-            end
-        end
-    end)
-    
-    serverList.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 16)
-    
-    status1.Text = string.format("✅ COMPLETO!\n💎 %d brainrots aqui", count)
-    status1.TextColor3 = Color3.fromRGB(100, 255, 150)
-    searchBtn.Text = "⚡ BUSCAR SERVIDORES"
-    searchBtn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
-    print("✅ Busca finalizada!")
-end
-
--- EVENTOS
-searchBtn.MouseButton1Click:Connect(function()
-    print("👆 Botão BUSCAR clicado")
-    scanServers()
+CriarBotao("⚡ Buscar Rápido", Color3.fromRGB(50, 80, 50), function()
+	TeleportarParaServidor("")
 end)
 
-saveBtn.MouseButton1Click:Connect(function()
-    print("👆 Botão SALVAR clicado")
-    savedPos = hrp.Position
-    saveBtn.Text = "✅ SALVO!"
-    saveBtn.BackgroundColor3 = Color3.fromRGB(50, 255, 100)
-    status2.Text = string.format("✅ SALVO!\n📍 X:%.0f Y:%.0f Z:%.0f", savedPos.X, savedPos.Y, savedPos.Z)
-    status2.TextColor3 = Color3.fromRGB(100, 255, 150)
-    print(string.format("📍 Posição salva: %.0f, %.0f, %.0f", savedPos.X, savedPos.Y, savedPos.Z))
-    wait(2)
-    saveBtn.Text = "📍 SALVAR POSIÇÃO"
-    saveBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+-- Seta para próxima aba
+local Next = CriarBotao("➡ Próximo", Color3.fromRGB(60, 60, 60), function() end)
+Next.Size = UDim2.new(0, 120, 0, 30)
+
+-- Aba 2: salvar posição
+local SaveFrame = Instance.new("Frame", MainFrame)
+SaveFrame.Size = UDim2.new(1, 0, 1, -40)
+SaveFrame.Position = UDim2.new(0, 0, 0, 40)
+SaveFrame.BackgroundTransparency = 1
+SaveFrame.Visible = false
+
+local savedPosition = nil
+local teleported = false
+
+local SaveBtn = Instance.new("TextButton", SaveFrame)
+SaveBtn.Size = UDim2.new(0, 300, 0, 40)
+SaveBtn.Position = UDim2.new(0.5, -150, 0.3, 0)
+SaveBtn.Text = "💾 Salvar Posição"
+SaveBtn.Font = Enum.Font.GothamBold
+SaveBtn.TextSize = 16
+SaveBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
+SaveBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", SaveBtn)
+
+SaveBtn.MouseButton1Click:Connect(function()
+	local char = LocalPlayer.Character
+	if char and char:FindFirstChild("HumanoidRootPart") then
+		savedPosition = char.HumanoidRootPart.CFrame
+		teleported = false
+		StarterGui:SetCore("SendNotification", {Title="✅ Posição Salva", Text="Sua posição foi guardada.", Duration=3})
+	end
 end)
 
-backBtn.MouseButton1Click:Connect(function()
-    print("👆 Botão VOLTAR clicado")
-    if not savedPos then
-        status2.Text = "⚠️ SALVE ANTES!\n❌ Use botão acima"
-        status2.TextColor3 = Color3.fromRGB(255, 200, 100)
-        print("⚠️ Nenhuma posição salva")
-        return
-    end
-    
-    status2.Text = "↩️ VOLTANDO...\n📍 Teleportando"
-    status2.TextColor3 = Color3.fromRGB(100, 200, 255)
-    backBtn.Text = "⏳..."
-    
-    hrp.CFrame = CFrame.new(savedPos)
+local BackBtn = Instance.new("TextButton", SaveFrame)
+BackBtn.Size = UDim2.new(0, 300, 0, 40)
+BackBtn.Position = UDim2.new(0.5, -150, 0.55, 0)
+BackBtn.Text = "↩ Voltar para Posição"
+BackBtn.Font = Enum.Font.GothamBold
+BackBtn.TextSize = 16
+BackBtn.BackgroundColor3 = Color3.fromRGB(80, 40, 40)
+BackBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", BackBtn)
+
+BackBtn.MouseButton1Click:Connect(function()
+	local char = LocalPlayer.Character
+	if savedPosition and char and char:FindFirstChild("HumanoidRootPart") then
+		if not teleported then
+			teleported = true
+			char:SetPrimaryPartCFrame(savedPosition)
+			StarterGui:SetCore("SendNotification", {Title="↩ Teleportado", Text="Você voltou à posição salva!", Duration=3})
+		end
+	else
+		StarterGui:SetCore("SendNotification", {Title="❌ Erro", Text="Nenhuma posição salva!", Duration=3})
+	end
+end)
+
+-- Voltar à aba 1
+local BackToServers = Instance.new("TextButton", SaveFrame)
+BackToServers.Size = UDim2.new(0, 100, 0, 30)
+BackToServers.Position = UDim2.new(0.5, -50, 0.8, 0)
+BackToServers.Text = "⬅ Voltar"
+BackToServers.Font = Enum.Font.GothamSemibold
+BackToServers.TextSize = 16
+BackToServers.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+BackToServers.TextColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", BackToServers)
+
+Next.MouseButton1Click:Connect(function()
+	ServerFrame.Visible = false
+	SaveFrame.Visible = true
+end)
+
+BackToServers.MouseButton1Click:Connect(function()
+	ServerFrame.Visible = true
+	SaveFrame.Visible = false
+end)
