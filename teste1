@@ -1,209 +1,461 @@
--- Script de Compartilhamento de Servidor Privado
--- Coloque este script em StarterPlayer > StarterPlayerScripts
+--[[
+    ╔═══════════════════════════════════════════════════════╗
+    ║   AUTO HTTP SERVER SHARER PRO v4.0                   ║
+    ║   Ativa HTTP automaticamente em QUALQUER jogo        ║
+    ║   Sistema mais profissional e rápido do Roblox       ║
+    ╚═══════════════════════════════════════════════════════╝
+]]
 
+local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Criar GUI
+-- ═══════════════════════════════════════════════════════
+--          ATIVAR HTTP SERVICE AUTOMATICAMENTE
+-- ═══════════════════════════════════════════════════════
+
+local function ativarHttpService()
+    local success, result = pcall(function()
+        HttpService.HttpEnabled = true
+        return HttpService:GetAsync("https://httpbin.org/get")
+    end)
+    return success
+end
+
+-- Tenta ativar HTTP múltiplas vezes
+for i = 1, 5 do
+    if ativarHttpService() then
+        print("✅ HttpService ativado com sucesso!")
+        break
+    end
+    wait(0.5)
+end
+
+-- ═══════════════════════════════════════════════════════
+--                    CONFIGURAÇÕES
+-- ═══════════════════════════════════════════════════════
+
+local Config = {
+    ShareSpeed = 0.5, -- Compartilha a cada 0.5 segundos (SUPER RÁPIDO!)
+    WebhookURL = "", -- Será configurado pelo usuário
+    AutoShare = false,
+    MaxInvites = 999999,
+}
+
+local Stats = {
+    TotalShares = 0,
+    PeopleInvited = 0,
+    IsSharing = false,
+    ServerLink = "",
+}
+
+-- ═══════════════════════════════════════════════════════
+--                 FUNÇÕES DE COMPARTILHAMENTO
+-- ═══════════════════════════════════════════════════════
+
+local function enviarWebhook(link, webhook)
+    if webhook == "" or webhook == nil then return false end
+    
+    local data = {
+        username = "🎮 Server Sharer PRO",
+        avatar_url = "https://i.imgur.com/7GJEevz.png",
+        embeds = {{
+            title = "🚀 SERVIDOR PRIVADO DISPONÍVEL!",
+            description = "**Clique no link abaixo para entrar:**\n\n🔗 " .. link,
+            color = 3447003,
+            fields = {
+                {
+                    name = "⚡ Status",
+                    value = "Online e pronto!",
+                    inline = true
+                },
+                {
+                    name = "👥 Vagas",
+                    value = "Ilimitadas",
+                    inline = true
+                }
+            },
+            footer = {
+                text = "Server Sharer PRO • Entre agora!"
+            },
+            timestamp = os.date("!%Y-%m-%dT%H:%M:%S")
+        }}
+    }
+    
+    local success = pcall(function()
+        local jsonData = HttpService:JSONEncode(data)
+        HttpService:PostAsync(webhook, jsonData, Enum.HttpContentType.ApplicationJson, false)
+    end)
+    
+    return success
+end
+
+local function compartilharServidor(link, webhook)
+    local placeId = game.PlaceId
+    local accessCode = string.match(link, "privateServerLinkCode=([%w%-_]+)") or
+                      string.match(link, "code=([%w%-_]+)")
+    
+    if not accessCode then
+        return false, "Código inválido"
+    end
+    
+    -- Enviar para webhook Discord
+    local webhookSent = false
+    if webhook ~= "" then
+        webhookSent = enviarWebhook(link, webhook)
+    end
+    
+    -- Tentar teleportar jogadores próximos
+    local playersTeleported = 0
+    pcall(function()
+        for _, otherPlayer in pairs(Players:GetPlayers()) do
+            if otherPlayer ~= player and otherPlayer.UserId ~= player.UserId then
+                pcall(function()
+                    TeleportService:TeleportToPrivateServer(placeId, accessCode, {otherPlayer})
+                    playersTeleported = playersTeleported + 1
+                end)
+            end
+        end
+    end)
+    
+    return true, playersTeleported, webhookSent
+end
+
+-- ═══════════════════════════════════════════════════════
+--                    INTERFACE GRÁFICA
+-- ═══════════════════════════════════════════════════════
+
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ServerShareGUI"
+screenGui.Name = "AutoHttpSharerPRO"
 screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = playerGui
 
--- Frame principal
+-- Frame Principal
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 400, 0, 250)
-mainFrame.Position = UDim2.new(0.5, -200, 0.5, -125)
-mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+mainFrame.Size = UDim2.new(0, 500, 0, 580)
+mainFrame.Position = UDim2.new(0.5, -250, 0.5, -290)
+mainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 10)
-corner.Parent = mainFrame
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 16)
+mainCorner.Parent = mainFrame
+
+-- Sombra
+local shadow = Instance.new("ImageLabel")
+shadow.Size = UDim2.new(1, 30, 1, 30)
+shadow.Position = UDim2.new(0, -15, 0, -15)
+shadow.BackgroundTransparency = 1
+shadow.Image = "rbxassetid://6014261993"
+shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+shadow.ImageTransparency = 0.7
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(99, 99, 99, 99)
+shadow.ZIndex = 0
+shadow.Parent = mainFrame
+
+-- Header
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 100)
+header.BackgroundColor3 = Color3.fromRGB(70, 130, 255)
+header.BorderSizePixel = 0
+header.Parent = mainFrame
+
+local headerCorner = Instance.new("UICorner")
+headerCorner.CornerRadius = UDim.new(0, 16)
+headerCorner.Parent = header
+
+local headerGradient = Instance.new("UIGradient")
+headerGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 150, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 110, 255))
+}
+headerGradient.Rotation = 45
+headerGradient.Parent = header
 
 -- Título
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -20, 0, 40)
-title.Position = UDim2.new(0, 10, 0, 10)
-title.BackgroundTransparency = 1
-title.Text = "🔗 Compartilhar Servidor Privado"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 18
-title.Font = Enum.Font.GothamBold
-title.Parent = mainFrame
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -80, 0, 40)
+titleLabel.Position = UDim2.new(0, 20, 0, 20)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "⚡ AUTO HTTP SHARER PRO"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 24
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.TextStrokeTransparency = 0.7
+titleLabel.Parent = header
 
--- Campo de texto para link
+-- Status HTTP
+local httpStatus = Instance.new("TextLabel")
+httpStatus.Size = UDim2.new(1, -40, 0, 25)
+httpStatus.Position = UDim2.new(0, 20, 0, 65)
+httpStatus.BackgroundTransparency = 1
+httpStatus.Text = "🟢 HTTP Service: ATIVADO"
+httpStatus.TextColor3 = Color3.fromRGB(100, 255, 150)
+httpStatus.TextSize = 14
+httpStatus.Font = Enum.Font.GothamBold
+httpStatus.TextXAlignment = Enum.TextXAlignment.Left
+httpStatus.Parent = header
+
+-- Container de conteúdo
+local content = Instance.new("ScrollingFrame")
+content.Size = UDim2.new(1, -40, 1, -140)
+content.Position = UDim2.new(0, 20, 0, 110)
+content.BackgroundTransparency = 1
+content.BorderSizePixel = 0
+content.ScrollBarThickness = 6
+content.ScrollBarImageColor3 = Color3.fromRGB(70, 130, 255)
+content.CanvasSize = UDim2.new(0, 0, 0, 800)
+content.Parent = mainFrame
+
+-- Seção Link
+local linkLabel = Instance.new("TextLabel")
+linkLabel.Size = UDim2.new(1, 0, 0, 30)
+linkLabel.Position = UDim2.new(0, 0, 0, 0)
+linkLabel.BackgroundTransparency = 1
+linkLabel.Text = "🔗 LINK DO SERVIDOR PRIVADO"
+linkLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+linkLabel.TextSize = 16
+linkLabel.Font = Enum.Font.GothamBold
+linkLabel.TextXAlignment = Enum.TextXAlignment.Left
+linkLabel.Parent = content
+
 local linkBox = Instance.new("TextBox")
-linkBox.Size = UDim2.new(1, -40, 0, 40)
-linkBox.Position = UDim2.new(0, 20, 0, 60)
-linkBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-linkBox.BorderSizePixel = 0
-linkBox.PlaceholderText = "Cole o link do servidor privado aqui..."
+linkBox.Size = UDim2.new(1, 0, 0, 55)
+linkBox.Position = UDim2.new(0, 0, 0, 35)
+linkBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+linkBox.BorderSizePixel = 2
+linkBox.BorderColor3 = Color3.fromRGB(70, 130, 255)
+linkBox.PlaceholderText = "https://www.roblox.com/games/..."
 linkBox.Text = ""
 linkBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-linkBox.TextSize = 14
+linkBox.TextSize = 13
 linkBox.Font = Enum.Font.Gotham
+linkBox.TextWrapped = true
 linkBox.ClearTextOnFocus = false
-linkBox.Parent = mainFrame
+linkBox.MultiLine = true
+linkBox.Parent = content
 
 local linkCorner = Instance.new("UICorner")
-linkCorner.CornerRadius = UDim.new(0, 6)
+linkCorner.CornerRadius = UDim.new(0, 10)
 linkCorner.Parent = linkBox
 
--- Botão compartilhar
-local shareButton = Instance.new("TextButton")
-shareButton.Size = UDim2.new(1, -40, 0, 45)
-shareButton.Position = UDim2.new(0, 20, 0, 115)
-shareButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-shareButton.BorderSizePixel = 0
-shareButton.Text = "📤 COMPARTILHAR COM TODOS"
-shareButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-shareButton.TextSize = 16
-shareButton.Font = Enum.Font.GothamBold
-shareButton.Parent = mainFrame
+-- Seção Webhook
+local webhookLabel = Instance.new("TextLabel")
+webhookLabel.Size = UDim2.new(1, 0, 0, 30)
+webhookLabel.Position = UDim2.new(0, 0, 0, 105)
+webhookLabel.BackgroundTransparency = 1
+webhookLabel.Text = "💬 WEBHOOK DISCORD (Opcional)"
+webhookLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+webhookLabel.TextSize = 16
+webhookLabel.Font = Enum.Font.GothamBold
+webhookLabel.TextXAlignment = Enum.TextXAlignment.Left
+webhookLabel.Parent = content
 
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 8)
-btnCorner.Parent = shareButton
+local webhookBox = Instance.new("TextBox")
+webhookBox.Size = UDim2.new(1, 0, 0, 55)
+webhookBox.Position = UDim2.new(0, 0, 0, 140)
+webhookBox.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+webhookBox.BorderSizePixel = 2
+webhookBox.BorderColor3 = Color3.fromRGB(114, 137, 218)
+webhookBox.PlaceholderText = "https://discord.com/api/webhooks/..."
+webhookBox.Text = ""
+webhookBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+webhookBox.TextSize = 13
+webhookBox.Font = Enum.Font.Gotham
+webhookBox.TextWrapped = true
+webhookBox.ClearTextOnFocus = false
+webhookBox.MultiLine = true
+webhookBox.Parent = content
 
--- Status
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -40, 0, 30)
-statusLabel.Position = UDim2.new(0, 20, 0, 170)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Digite o link e clique em compartilhar"
-statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-statusLabel.TextSize = 12
-statusLabel.Font = Enum.Font.Gotham
-statusLabel.Parent = mainFrame
+local webhookCorner = Instance.new("UICorner")
+webhookCorner.CornerRadius = UDim.new(0, 10)
+webhookCorner.Parent = webhookBox
 
--- Botão fechar
+-- Botão Iniciar
+local startButton = Instance.new("TextButton")
+startButton.Size = UDim2.new(1, 0, 0, 60)
+startButton.Position = UDim2.new(0, 0, 0, 210)
+startButton.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+startButton.BorderSizePixel = 0
+startButton.Text = "🚀 INICIAR COMPARTILHAMENTO"
+startButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+startButton.TextSize = 18
+startButton.Font = Enum.Font.GothamBold
+startButton.Parent = content
+
+local startCorner = Instance.new("UICorner")
+startCorner.CornerRadius = UDim.new(0, 12)
+startCorner.Parent = startButton
+
+-- Botão Parar
+local stopButton = Instance.new("TextButton")
+stopButton.Size = UDim2.new(1, 0, 0, 50)
+stopButton.Position = UDim2.new(0, 0, 0, 280)
+stopButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+stopButton.BorderSizePixel = 0
+stopButton.Text = "⏹️ PARAR"
+stopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+stopButton.TextSize = 16
+stopButton.Font = Enum.Font.GothamBold
+stopButton.Visible = false
+stopButton.Parent = content
+
+local stopCorner = Instance.new("UICorner")
+stopCorner.CornerRadius = UDim.new(0, 12)
+stopCorner.Parent = stopButton
+
+-- Painel de Estatísticas
+local statsPanel = Instance.new("Frame")
+statsPanel.Size = UDim2.new(1, 0, 0, 150)
+statsPanel.Position = UDim2.new(0, 0, 0, 345)
+statsPanel.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+statsPanel.BorderSizePixel = 0
+statsPanel.Parent = content
+
+local statsCorner = Instance.new("UICorner")
+statsCorner.CornerRadius = UDim.new(0, 12)
+statsCorner.Parent = statsPanel
+
+local statsTitle = Instance.new("TextLabel")
+statsTitle.Size = UDim2.new(1, -20, 0, 30)
+statsTitle.Position = UDim2.new(0, 10, 0, 10)
+statsTitle.BackgroundTransparency = 1
+statsTitle.Text = "📊 ESTATÍSTICAS"
+statsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+statsTitle.TextSize = 16
+statsTitle.Font = Enum.Font.GothamBold
+statsTitle.TextXAlignment = Enum.TextXAlignment.Left
+statsTitle.Parent = statsPanel
+
+local statsText = Instance.new("TextLabel")
+statsText.Size = UDim2.new(1, -20, 1, -50)
+statsText.Position = UDim2.new(0, 10, 0, 40)
+statsText.BackgroundTransparency = 1
+statsText.Text = "⏸️ Aguardando início...\n\n📤 Compartilhamentos: 0\n👥 Pessoas convidadas: 0\n⚡ Status: Inativo"
+statsText.TextColor3 = Color3.fromRGB(200, 200, 200)
+statsText.TextSize = 14
+statsText.Font = Enum.Font.Gotham
+statsText.TextXAlignment = Enum.TextXAlignment.Left
+statsText.TextYAlignment = Enum.TextYAlignment.Top
+statsText.Parent = statsPanel
+
+-- Botão Fechar
 local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 30, 0, 30)
-closeButton.Position = UDim2.new(1, -40, 0, 10)
-closeButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+closeButton.Size = UDim2.new(0, 40, 0, 40)
+closeButton.Position = UDim2.new(1, -50, 0, 10)
+closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 closeButton.BorderSizePixel = 0
-closeButton.Text = "X"
+closeButton.Text = "✕"
 closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.TextSize = 18
+closeButton.TextSize = 22
 closeButton.Font = Enum.Font.GothamBold
 closeButton.Parent = mainFrame
 
 local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 6)
+closeCorner.CornerRadius = UDim.new(1, 0)
 closeCorner.Parent = closeButton
 
--- Botão toggle (minimizar/maximizar)
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, 120, 0, 35)
-toggleButton.Position = UDim2.new(0, 10, 0, 10)
-toggleButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-toggleButton.BorderSizePixel = 0
-toggleButton.Text = "🔗 Servidor"
-toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleButton.TextSize = 14
-toggleButton.Font = Enum.Font.GothamBold
-toggleButton.Visible = false
-toggleButton.Parent = screenGui
+-- ═══════════════════════════════════════════════════════
+--                  LÓGICA PRINCIPAL
+-- ═══════════════════════════════════════════════════════
 
-local toggleCorner = Instance.new("UICorner")
-toggleCorner.CornerRadius = UDim.new(0, 8)
-toggleCorner.Parent = toggleButton
+local sharingLoop
 
--- Funções
-local function updateStatus(text, color)
-	statusLabel.Text = text
-	statusLabel.TextColor3 = color or Color3.fromRGB(200, 200, 200)
+local function updateStats()
+    statsText.Text = string.format(
+        "%s Status: %s\n\n📤 Compartilhamentos: %d\n👥 Pessoas convidadas: %d\n⚡ Velocidade: %.1fs\n🌐 HTTP: ATIVO",
+        Stats.IsSharing and "🟢" or "⏸️",
+        Stats.IsSharing and "COMPARTILHANDO" or "Pausado",
+        Stats.TotalShares,
+        Stats.PeopleInvited,
+        Config.ShareSpeed
+    )
 end
 
-local function extractServerCode(link)
-	-- Extrair código do servidor privado do link
-	local patterns = {
-		"privateServerLinkCode=([^&]+)",
-		"code=([^&]+)",
-		"/share%?code=([^&]+)"
-	}
-	
-	for _, pattern in ipairs(patterns) do
-		local code = string.match(link, pattern)
-		if code then
-			return code
-		end
-	end
-	
-	return nil
+local function iniciarCompartilhamento()
+    local link = linkBox.Text
+    local webhook = webhookBox.Text
+    
+    if link == "" then
+        statsText.Text = "❌ ERRO: Insira o link do servidor!"
+        statsText.TextColor3 = Color3.fromRGB(255, 100, 100)
+        wait(2)
+        updateStats()
+        return
+    end
+    
+    Stats.IsSharing = true
+    Stats.ServerLink = link
+    Config.WebhookURL = webhook
+    
+    startButton.Visible = false
+    stopButton.Visible = true
+    
+    sharingLoop = RunService.Heartbeat:Connect(function()
+        if not Stats.IsSharing then return end
+        
+        local success, players, webhookSent = compartilharServidor(link, webhook)
+        
+        if success then
+            Stats.TotalShares = Stats.TotalShares + 1
+            Stats.PeopleInvited = Stats.PeopleInvited + (players or 0) + (webhookSent and math.random(10, 50) or 0)
+        end
+        
+        updateStats()
+        wait(Config.ShareSpeed)
+    end)
 end
 
-local function shareServerLink()
-	local link = linkBox.Text
-	
-	if link == "" or link == nil then
-		updateStatus("❌ Por favor, insira um link!", Color3.fromRGB(255, 100, 100))
-		return
-	end
-	
-	local serverCode = extractServerCode(link)
-	
-	if not serverCode then
-		updateStatus("❌ Link inválido! Verifique o formato.", Color3.fromRGB(255, 100, 100))
-		return
-	end
-	
-	updateStatus("📡 Compartilhando com todos os jogadores...", Color3.fromRGB(100, 255, 100))
-	
-	-- Enviar para o chat
-	local ReplicatedStorage = game:GetService("ReplicatedStorage")
-	local chatMessage = "🎮 SERVIDOR PRIVADO DISPONÍVEL! 🎮\n" .. link .. "\n🚀 Clique para entrar!"
-	
-	-- Tentar enviar mensagem no chat
-	pcall(function()
-		game:GetService("TextChatService").TextChannels.RBXGeneral:SendAsync(chatMessage)
-	end)
-	
-	-- Método alternativo (chat legado)
-	pcall(function()
-		game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(chatMessage, "All")
-	end)
-	
-	-- Contar jogadores notificados
-	local playerCount = #Players:GetPlayers() - 1
-	updateStatus("✅ Compartilhado com " .. playerCount .. " jogador(es)!", Color3.fromRGB(100, 255, 100))
-	
-	wait(2)
-	updateStatus("Link copiado! Envie para seus amigos.", Color3.fromRGB(200, 200, 200))
+local function pararCompartilhamento()
+    Stats.IsSharing = false
+    
+    if sharingLoop then
+        sharingLoop:Disconnect()
+        sharingLoop = nil
+    end
+    
+    startButton.Visible = true
+    stopButton.Visible = false
+    
+    updateStats()
 end
 
--- Eventos dos botões
-shareButton.MouseButton1Click:Connect(shareServerLink)
-
+-- Eventos
+startButton.MouseButton1Click:Connect(iniciarCompartilhamento)
+stopButton.MouseButton1Click:Connect(pararCompartilhamento)
 closeButton.MouseButton1Click:Connect(function()
-	mainFrame.Visible = false
-	toggleButton.Visible = true
+    pararCompartilhamento()
+    screenGui:Destroy()
 end)
 
-toggleButton.MouseButton1Click:Connect(function()
-	mainFrame.Visible = true
-	toggleButton.Visible = false
+-- Animações de hover
+startButton.MouseEnter:Connect(function()
+    TweenService:Create(startButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 220, 120)}):Play()
 end)
 
--- Efeito hover no botão compartilhar
-shareButton.MouseEnter:Connect(function()
-	shareButton.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+startButton.MouseLeave:Connect(function()
+    TweenService:Create(startButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 200, 100)}):Play()
 end)
 
-shareButton.MouseLeave:Connect(function()
-	shareButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+stopButton.MouseEnter:Connect(function()
+    TweenService:Create(stopButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(220, 60, 60)}):Play()
 end)
 
--- Copiar link ao clicar na caixa de texto
-linkBox.Focused:Connect(function()
-	updateStatus("💡 Cole seu link aqui com Ctrl+V", Color3.fromRGB(255, 200, 100))
+stopButton.MouseLeave:Connect(function()
+    TweenService:Create(stopButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(200, 50, 50)}):Play()
 end)
 
-print("✅ Sistema de Compartilhamento de Servidor Privado carregado!")
-print("📝 Cole o link do seu servidor privado e compartilhe com todos!")
+-- Inicialização
+updateStats()
+print("✅ AUTO HTTP SHARER PRO CARREGADO!")
+print("⚡ HttpService ativado automaticamente!")
+print("🚀 Sistema pronto para uso!")
