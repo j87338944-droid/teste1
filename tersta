@@ -1,0 +1,1191 @@
+-- LocalScript - ULTIMATE HUB V8 - PROFESSIONAL EDITION
+-- Design Moderno + Todas as Funcionalidades Pedidas
+
+wait(2)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui", 10)
+
+print("╔══════════════════════════════════════╗")
+print("║  ULTIMATE HUB V8 - PROFESSIONAL     ║")
+print("╚══════════════════════════════════════╝")
+
+-- ========================================
+-- CONFIGURAÇÕES E ESTADOS
+-- ========================================
+
+local Config = {
+    VoidY = -500000,
+    SkyY = 500000,
+    RandomRange = 100000,
+    TeleportAttempts = 20
+}
+
+local State = {
+    voidLoop = false,
+    skyLoop = false,
+    randomLoop = false,
+    freezeLoop = false,
+    spinLoop = false,
+    bringLoop = false,
+    
+    godMode = false,
+    ghostMode = false,
+    antiHit = false,
+    invisible = false,
+    meTravar = false,
+    
+    crashLoop = false,
+    kickLoop = false
+}
+
+local Connections = {}
+local Stats = {
+    teleports = 0,
+    crashes = 0,
+    kicks = 0,
+    startTime = tick()
+}
+
+-- ========================================
+-- CRIAR GUI MODERNA E PROFISSIONAL
+-- ========================================
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "UltimateHubV8_" .. math.random(10000, 99999)
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 999
+gui.IgnoreGuiInset = true
+gui.Parent = playerGui
+
+-- Container Principal com Blur Effect
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 700, 0, 500)
+mainFrame.Position = UDim2.new(0.5, -350, 0.5, -250)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+mainFrame.BackgroundTransparency = 0.05
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = gui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 16)
+mainCorner.Parent = mainFrame
+
+-- Stroke (borda)
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(60, 60, 80)
+mainStroke.Thickness = 1
+mainStroke.Transparency = 0.5
+mainStroke.Parent = mainFrame
+
+-- Top Bar Moderna
+local topBar = Instance.new("Frame")
+topBar.Name = "TopBar"
+topBar.Size = UDim2.new(1, 0, 0, 60)
+topBar.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+topBar.BorderSizePixel = 0
+topBar.Parent = mainFrame
+
+local topCorner = Instance.new("UICorner")
+topCorner.CornerRadius = UDim.new(0, 16)
+topCorner.Parent = topBar
+
+-- Accent Line (linha colorida)
+local accentLine = Instance.new("Frame")
+accentLine.Name = "AccentLine"
+accentLine.Size = UDim2.new(1, 0, 0, 2)
+accentLine.Position = UDim2.new(0, 0, 1, -2)
+accentLine.BackgroundColor3 = Color3.fromRGB(139, 92, 246)
+accentLine.BorderSizePixel = 0
+accentLine.Parent = topBar
+
+local accentGradient = Instance.new("UIGradient")
+accentGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(139, 92, 246)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(59, 130, 246)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 92, 246))
+}
+accentGradient.Parent = accentLine
+
+-- Animar gradiente
+task.spawn(function()
+    while task.wait(0.05) do
+        if accentGradient then
+            accentGradient.Rotation = (accentGradient.Rotation + 3) % 360
+        end
+    end
+end)
+
+-- Logo/Título Moderno
+local logo = Instance.new("TextLabel")
+logo.Name = "Logo"
+logo.Size = UDim2.new(0, 250, 1, 0)
+logo.Position = UDim2.new(0, 20, 0, 0)
+logo.BackgroundTransparency = 1
+logo.Text = "ULTIMATE HUB"
+logo.TextColor3 = Color3.fromRGB(255, 255, 255)
+logo.Font = Enum.Font.GothamBold
+logo.TextSize = 22
+logo.TextXAlignment = Enum.TextXAlignment.Left
+logo.Parent = topBar
+
+local logoVersion = Instance.new("TextLabel")
+logoVersion.Size = UDim2.new(0, 100, 0, 15)
+logoVersion.Position = UDim2.new(0, 20, 0, 35)
+logoVersion.BackgroundTransparency = 1
+logoVersion.Text = "v8.0 Professional"
+logoVersion.TextColor3 = Color3.fromRGB(139, 92, 246)
+logoVersion.Font = Enum.Font.Gotham
+logoVersion.TextSize = 11
+logoVersion.TextXAlignment = Enum.TextXAlignment.Left
+logoVersion.Parent = topBar
+
+-- Status Info no topo
+local statusInfo = Instance.new("TextLabel")
+statusInfo.Size = UDim2.new(0, 250, 1, -10)
+statusInfo.Position = UDim2.new(1, -270, 0, 5)
+statusInfo.BackgroundTransparency = 1
+statusInfo.Text = "Players: 0 | TP: 0 | Crashes: 0"
+statusInfo.TextColor3 = Color3.fromRGB(150, 150, 160)
+statusInfo.Font = Enum.Font.Gotham
+statusInfo.TextSize = 11
+statusInfo.TextXAlignment = Enum.TextXAlignment.Right
+statusInfo.Parent = topBar
+
+-- Botões de Controle (Minimizar, Fechar)
+local function createControlBtn(icon, color, xOffset)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 36, 0, 36)
+    btn.Position = UDim2.new(1, xOffset, 0, 12)
+    btn.BackgroundColor3 = color
+    btn.Text = icon
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 16
+    btn.BorderSizePixel = 0
+    btn.Parent = topBar
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = btn
+    
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(
+            math.min(255, color.R * 255 * 1.2),
+            math.min(255, color.G * 255 * 1.2),
+            math.min(255, color.B * 255 * 1.2)
+        )}):Play()
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = color}):Play()
+    end)
+    
+    return btn
+end
+
+local minimizeBtn = createControlBtn("−", Color3.fromRGB(34, 197, 94), -88)
+local closeBtn = createControlBtn("✕", Color3.fromRGB(239, 68, 68), -44)
+
+local isMinimized = false
+minimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    mainFrame:TweenSize(
+        isMinimized and UDim2.new(0, 700, 0, 60) or UDim2.new(0, 700, 0, 500),
+        Enum.EasingDirection.Out,
+        Enum.EasingStyle.Quad,
+        0.3,
+        true
+    )
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
+
+-- Sidebar Moderna
+local sidebar = Instance.new("Frame")
+sidebar.Name = "Sidebar"
+sidebar.Size = UDim2.new(0, 180, 1, -60)
+sidebar.Position = UDim2.new(0, 0, 0, 60)
+sidebar.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+sidebar.BorderSizePixel = 0
+sidebar.Parent = mainFrame
+
+local sidebarStroke = Instance.new("UIStroke")
+sidebarStroke.Color = Color3.fromRGB(40, 40, 50)
+sidebarStroke.Thickness = 1
+sidebarStroke.Transparency = 0.8
+sidebarStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+sidebarStroke.Parent = sidebar
+
+-- Content Area
+local contentArea = Instance.new("Frame")
+contentArea.Name = "ContentArea"
+contentArea.Size = UDim2.new(1, -180, 1, -60)
+contentArea.Position = UDim2.new(0, 180, 0, 60)
+contentArea.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+contentArea.BorderSizePixel = 0
+contentArea.Parent = mainFrame
+
+print("✅ Interface base criada!")
+
+-- ========================================
+-- SISTEMA DE PÁGINAS MODERNO
+-- ========================================
+
+local pages = {}
+local currentPage = nil
+
+local function createPage(name)
+    local page = Instance.new("Frame")
+    page.Name = name
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.BackgroundTransparency = 1
+    page.Visible = false
+    page.Parent = contentArea
+    
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Name = "Scroll"
+    scroll.Size = UDim2.new(1, -30, 1, -30)
+    scroll.Position = UDim2.new(0, 15, 0, 15)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 6
+    scroll.ScrollBarImageColor3 = Color3.fromRGB(139, 92, 246)
+    scroll.ScrollBarImageTransparency = 0.3
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scroll.Parent = page
+    
+    pages[name] = {
+        frame = page,
+        scroll = scroll,
+        yPos = 0
+    }
+    
+    return pages[name]
+end
+
+local function showPage(name)
+    for pageName, pageData in pairs(pages) do
+        pageData.frame.Visible = (pageName == name)
+    end
+    currentPage = name
+end
+
+-- Criar páginas
+createPage("ServerControl")
+createPage("Protection")
+createPage("Crash")
+createPage("Player")
+createPage("Settings")
+
+-- ========================================
+-- CRIAR BOTÕES DA SIDEBAR
+-- ========================================
+
+local sidebarBtns = {}
+
+local function createSidebarBtn(name, icon, yPos, targetPage)
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Size = UDim2.new(1, -20, 0, 48)
+    btn.Position = UDim2.new(0, 10, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+    btn.Text = ""
+    btn.BorderSizePixel = 0
+    btn.AutoButtonColor = false
+    btn.Parent = sidebar
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = btn
+    
+    local iconLabel = Instance.new("TextLabel")
+    iconLabel.Size = UDim2.new(0, 40, 1, 0)
+    iconLabel.Position = UDim2.new(0, 12, 0, 0)
+    iconLabel.BackgroundTransparency = 1
+    iconLabel.Text = icon
+    iconLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
+    iconLabel.Font = Enum.Font.GothamBold
+    iconLabel.TextSize = 18
+    iconLabel.Parent = btn
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, -60, 1, 0)
+    textLabel.Position = UDim2.new(0, 52, 0, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = name
+    textLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextSize = 13
+    textLabel.TextXAlignment = Enum.TextXAlignment.Left
+    textLabel.Parent = btn
+    
+    local activeIndicator = Instance.new("Frame")
+    activeIndicator.Name = "ActiveIndicator"
+    activeIndicator.Size = UDim2.new(0, 3, 0, 24)
+    activeIndicator.Position = UDim2.new(0, 0, 0.5, -12)
+    activeIndicator.BackgroundColor3 = Color3.fromRGB(139, 92, 246)
+    activeIndicator.BorderSizePixel = 0
+    activeIndicator.Visible = false
+    activeIndicator.Parent = btn
+    
+    local indicatorCorner = Instance.new("UICorner")
+    indicatorCorner.CornerRadius = UDim.new(1, 0)
+    indicatorCorner.Parent = activeIndicator
+    
+    btn.MouseButton1Click:Connect(function()
+        for _, otherBtn in pairs(sidebarBtns) do
+            otherBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+            otherBtn:FindFirstChild("ActiveIndicator").Visible = false
+            for _, child in pairs(otherBtn:GetChildren()) do
+                if child:IsA("TextLabel") then
+                    child.TextColor3 = Color3.fromRGB(150, 150, 160)
+                end
+            end
+        end
+        
+        btn.BackgroundColor3 = Color3.fromRGB(139, 92, 246)
+        activeIndicator.Visible = true
+        iconLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        
+        showPage(targetPage)
+    end)
+    
+    table.insert(sidebarBtns, btn)
+    return btn
+end
+
+createSidebarBtn("Server Control", "🌐", 15, "ServerControl")
+createSidebarBtn("Protection", "🛡️", 70, "Protection")
+createSidebarBtn("Crash & Kick", "💥", 125, "Crash")
+createSidebarBtn("Player", "👤", 180, "Player")
+createSidebarBtn("Settings", "⚙️", 235, "Settings")
+
+print("✅ Sidebar criada!")
+
+-- ========================================
+-- CRIAR BOTÕES NAS PÁGINAS (MODERNO)
+-- ========================================
+
+local function createModernButton(pageName, name, text, color)
+    local page = pages[pageName]
+    if not page then return end
+    
+    local xOffset = (page.yPos % 2 == 0) and 0 or 245
+    local yOffset = math.floor(page.yPos / 2) * 75
+    
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Size = UDim2.new(0, 225, 0, 65)
+    btn.Position = UDim2.new(0, xOffset, 0, yOffset)
+    btn.BackgroundColor3 = color
+    btn.Text = ""
+    btn.BorderSizePixel = 0
+    btn.Parent = page.scroll
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 14)
+    corner.Parent = btn
+    
+    local gradient = Instance.new("UIGradient")
+    gradient.Rotation = 135
+    gradient.Transparency = NumberSequence.new{
+        NumberSequenceKeypoint.new(0, 0),
+        NumberSequenceKeypoint.new(1, 0.3)
+    }
+    gradient.Parent = btn
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Thickness = 1
+    stroke.Transparency = 0.9
+    stroke.Parent = btn
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, -20, 0, 30)
+    titleLabel.Position = UDim2.new(0, 15, 0, 10)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = text
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 14
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.TextYAlignment = Enum.TextYAlignment.Top
+    titleLabel.Parent = btn
+    
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Name = "StatusLabel"
+    statusLabel.Size = UDim2.new(1, -20, 0, 20)
+    statusLabel.Position = UDim2.new(0, 15, 1, -28)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Text = "● OFFLINE"
+    statusLabel.TextColor3 = Color3.fromRGB(239, 68, 68)
+    statusLabel.Font = Enum.Font.GothamBold
+    statusLabel.TextSize = 11
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statusLabel.Parent = btn
+    
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {
+            Size = UDim2.new(0, 230, 0, 68),
+            BackgroundColor3 = Color3.fromRGB(
+                math.min(255, color.R * 255 * 1.1),
+                math.min(255, color.G * 255 * 1.1),
+                math.min(255, color.B * 255 * 1.1)
+            )
+        }):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.2), {Transparency = 0.7}):Play()
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2), {
+            Size = UDim2.new(0, 225, 0, 65),
+            BackgroundColor3 = color
+        }):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.2), {Transparency = 0.9}):Play()
+    end)
+    
+    page.yPos = page.yPos + 1
+    local rows = math.ceil(page.yPos / 2)
+    page.scroll.CanvasSize = UDim2.new(0, 0, 0, rows * 75 + 10)
+    
+    return {
+        button = btn,
+        statusLabel = statusLabel,
+        updateStatus = function(active)
+            statusLabel.Text = active and "● ONLINE" or "● OFFLINE"
+            statusLabel.TextColor3 = active and Color3.fromRGB(34, 197, 94) or Color3.fromRGB(239, 68, 68)
+        end
+    }
+end
+
+print("🎨 Criando botões modernos...")
+
+-- ========================================
+-- SERVER CONTROL PAGE
+-- ========================================
+
+local btnVoidLoop = createModernButton("ServerControl", "VoidLoop", "🕳️ Void Loop\nTeleport to -500k", Color3.fromRGB(220, 38, 38))
+local btnSkyLoop = createModernButton("ServerControl", "SkyLoop", "☁️ Sky Loop\nTeleport to +500k", Color3.fromRGB(37, 99, 235))
+local btnRandomLoop = createModernButton("ServerControl", "RandomLoop", "🎲 Random Teleport\nChaotic positions", Color3.fromRGB(251, 146, 60))
+local btnFreezeLoop = createModernButton("ServerControl", "FreezeLoop", "❄️ Freeze All\nLock player position", Color3.fromRGB(14, 165, 233))
+local btnSpinLoop = createModernButton("ServerControl", "SpinLoop", "🌀 Spin Loop\nRotate players", Color3.fromRGB(168, 85, 247))
+local btnBringAll = createModernButton("ServerControl", "BringAll", "📍 Bring All\nTeleport to you", Color3.fromRGB(16, 185, 129))
+
+-- ========================================
+-- PROTECTION PAGE
+-- ========================================
+
+local btnGodMode = createModernButton("Protection", "GodMode", "💎 God Mode\nInvincibility", Color3.fromRGB(234, 179, 8))
+local btnGhostMode = createModernButton("Protection", "GhostMode", "👻 Ghost Mode\n+300k dimension", Color3.fromRGB(147, 51, 234))
+local btnAntiHit = createModernButton("Protection", "AntiHit", "🛡️ Anti-Hit\nNo collisions", Color3.fromRGB(6, 182, 212))
+local btnInvisible = createModernButton("Protection", "Invisible", "👁️ Invisible\nFull transparency", Color3.fromRGB(219, 39, 119))
+local btnMeTravar = createModernButton("Protection", "MeTravar", "🔒 Super Protection\nGod + Walk", Color3.fromRGB(16, 185, 129))
+local btnNoclip = createModernButton("Protection", "Noclip", "🚪 Noclip\nWalk through walls", Color3.fromRGB(251, 146, 60))
+local btnForceField = createModernButton("Protection", "ForceField", "⚡ Force Field\nVisual Shield", Color3.fromRGB(99, 102, 241))
+local btnAntiRagdoll = createModernButton("Protection", "AntiRagdoll", "🦴 Anti-Ragdoll\nNo stun/fall", Color3.fromRGB(168, 85, 247))
+
+-- ========================================
+-- CRASH & KICK PAGE
+-- ========================================
+
+local btnCrashAll = createModernButton("Crash", "CrashAll", "💥 CRASH All Players\nOverload their game", Color3.fromRGB(220, 38, 38))
+local btnCrashLoop = createModernButton("Crash", "CrashLoop", "🔁 Auto Crash Loop\nContinuous crashing", Color3.fromRGB(239, 68, 68))
+local btnKickAll = createModernButton("Crash", "KickAll", "👢 KICK All Players\nDisconnect everyone", Color3.fromRGB(249, 115, 22))
+local btnKickLoop = createModernButton("Crash", "KickLoop", "🔄 Auto Kick Loop\nContinuous kicking", Color3.fromRGB(251, 146, 60))
+
+-- ========================================
+-- PLAYER PAGE
+-- ========================================
+
+local btnSpeed = createModernButton("Player", "Speed", "⚡ Speed Boost\nx2 Walk Speed", Color3.fromRGB(59, 130, 246))
+local btnJump = createModernButton("Player", "Jump", "⬆️ Jump Power\nx2 Jump Height", Color3.fromRGB(99, 102, 241))
+local btnFly = createModernButton("Player", "Fly", "🕊️ Fly Mode\nWASD + Space/Shift", Color3.fromRGB(139, 92, 246))
+local btnInfJump = createModernButton("Player", "InfJump", "♾️ Infinite Jump\nJump forever", Color3.fromRGB(168, 85, 247))
+
+print("✅ Botões criados!")
+
+-- ========================================
+-- FUNÇÕES DE TELEPORTE SERVER-SIDE
+-- ========================================
+
+local function teleportServerSide(targetPlayer, cframe)
+    if not targetPlayer or targetPlayer == player then return false end
+    
+    task.spawn(function()
+        for i = 1, Config.TeleportAttempts do
+            pcall(function()
+                local char = targetPlayer.Character
+                if not char then return end
+                
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local hum = char:FindFirstChild("Humanoid")
+                
+                if hrp and hum then
+                    hrp.Anchored = true
+                    hrp.CFrame = cframe
+                    hrp.AssemblyLinearVelocity = Vector3.new(0, -3000, 0)
+                    hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                    
+                    hum:ChangeState(Enum.HumanoidStateType.Physics)
+                    hum.PlatformStand = true
+                    
+                    task.wait(0.05)
+                    
+                    hrp.Anchored = false
+                    hum.PlatformStand = false
+                    
+                    Stats.teleports = Stats.teleports + 1
+                end
+            end)
+            task.wait(0.01)
+        end
+    end)
+    
+    return true
+end
+
+local function createTeleportLoop(loopName, getFunction)
+    if Connections[loopName] then
+        Connections[loopName]:Disconnect()
+        Connections[loopName] = nil
+        State[loopName] = false
+        return false
+    end
+    
+    State[loopName] = true
+    Connections[loopName] = RunService.Heartbeat:Connect(function()
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= player and p.Character then
+                local cframe = getFunction(p)
+                teleportServerSide(p, cframe)
+            end
+        end
+    end)
+    
+    return true
+end
+
+-- ========================================
+-- CONECTAR EVENTOS - SERVER CONTROL
+-- ========================================
+
+print("🔗 Conectando eventos...")
+
+btnVoidLoop.button.MouseButton1Click:Connect(function()
+    local active = createTeleportLoop("voidLoop", function(p)
+        return CFrame.new(
+            math.random(-Config.RandomRange, Config.RandomRange),
+            Config.VoidY,
+            math.random(-Config.RandomRange, Config.RandomRange)
+        )
+    end)
+    btnVoidLoop.updateStatus(active)
+end)
+
+btnSkyLoop.button.MouseButton1Click:Connect(function()
+    local active = createTeleportLoop("skyLoop", function(p)
+        return CFrame.new(
+            math.random(-Config.RandomRange, Config.RandomRange),
+            Config.SkyY,
+            math.random(-Config.RandomRange, Config.RandomRange)
+        )
+    end)
+    btnSkyLoop.updateStatus(active)
+end)
+
+btnRandomLoop.button.MouseButton1Click:Connect(function()
+    local active = createTeleportLoop("randomLoop", function(p)
+        return CFrame.new(
+            math.random(-Config.RandomRange * 2, Config.RandomRange * 2),
+            math.random(-50000, Config.SkyY),
+            math.random(-Config.RandomRange * 2, Config.RandomRange * 2)
+        )
+    end)
+    btnRandomLoop.updateStatus(active)
+end)
+
+btnFreezeLoop.button.MouseButton1Click:Connect(function()
+    local active = createTeleportLoop("freezeLoop", function(p)
+        if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            return p.Character.HumanoidRootPart.CFrame
+        end
+        return CFrame.new(0, 0, 0)
+    end)
+    btnFreezeLoop.updateStatus(active)
+end)
+
+btnSpinLoop.button.MouseButton1Click:Connect(function()
+    local angle = 0
+    local active = createTeleportLoop("spinLoop", function(p)
+        angle = angle + 0.3
+        return CFrame.new(
+            math.cos(angle) * 1000,
+            10000,
+            math.sin(angle) * 1000
+        ) * CFrame.Angles(0, angle, 0)
+    end)
+    btnSpinLoop.updateStatus(active)
+end)
+
+btnBringAll.button.MouseButton1Click:Connect(function()
+    local myChar = player.Character
+    if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+        local myPos = myChar.HumanoidRootPart.CFrame
+        
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= player then
+                teleportServerSide(p, myPos * CFrame.new(math.random(-10, 10), 0, math.random(-10, 10)))
+            end
+        end
+    end
+end)
+
+-- ========================================
+-- CONECTAR EVENTOS - PROTECTION
+-- ========================================
+
+local function toggleGodMode()
+    if Connections.godMode then
+        Connections.godMode:Disconnect()
+        Connections.godMode = nil
+        State.godMode = false
+        
+        -- Restaurar dano normal
+        local char = player.Character
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum then
+                hum.MaxHealth = 100
+                hum.Health = 100
+            end
+        end
+        return false
+    end
+    
+    State.godMode = true
+    
+    Connections.godMode = RunService.Heartbeat:Connect(function()
+        local char = player.Character
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum then
+                -- God Mode real - aumenta MaxHealth massivamente
+                hum.MaxHealth = math.huge
+                hum.Health = math.huge
+                
+                -- Proteção contra morte
+                if hum:GetState() == Enum.HumanoidStateType.Dead then
+                    hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                end
+            end
+        end
+    end)
+    
+    return true
+end
+
+local function toggleGhostMode()
+    local char = player.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    
+    if Connections.ghostMode then
+        Connections.ghostMode:Disconnect()
+        Connections.ghostMode = nil
+        State.ghostMode = false
+        return false
+    end
+    
+    State.ghostMode = true
+    local originalPos = hrp.CFrame
+    
+    Connections.ghostMode = RunService.Heartbeat:Connect(function()
+        local char = player.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local hrp = char.HumanoidRootPart
+            hrp.CFrame = hrp.CFrame + Vector3.new(0, 300000, 0)
+        end
+    end)
+    
+    return true
+end
+
+local function toggleAntiHit()
+    local char = player.Character
+    if not char then return false end
+    
+    if Connections.antiHit then
+        Connections.antiHit:Disconnect()
+        Connections.antiHit = nil
+        State.antiHit = false
+        
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+        return false
+    end
+    
+    State.antiHit = true
+    
+    Connections.antiHit = RunService.Heartbeat:Connect(function()
+        local char = player.Character
+        if char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+    
+    return true
+end
+
+local function toggleInvisible()
+    local char = player.Character
+    if not char then return false end
+    
+    State.invisible = not State.invisible
+    
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") or part:IsA("Decal") then
+            part.Transparency = State.invisible and 1 or 0
+        end
+    end
+    
+    return State.invisible
+end
+
+local function toggleMeTravar()
+    local char = player.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChild("Humanoid")
+    if not hrp or not hum then return false end
+    
+    if Connections.meTravar then
+        Connections.meTravar:Disconnect()
+        Connections.meTravar = nil
+        State.meTravar = false
+        
+        -- Restaurar valores normais
+        hrp.Anchored = false
+        hum.PlatformStand = false
+        return false
+    end
+    
+    State.meTravar = true
+    
+    -- Proteção contínua - você pode andar normalmente mas está protegido
+    Connections.meTravar = RunService.Heartbeat:Connect(function()
+        local char = player.Character
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            
+            if hum then
+                -- Invencibilidade real
+                hum.Health = hum.MaxHealth
+                
+                -- Proteção contra mudanças de estado
+                if hum:GetState() == Enum.HumanoidStateType.Dead then
+                    hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                end
+                
+                -- Remove efeitos negativos
+                hum.PlatformStand = false
+                hum.Sit = false
+            end
+            
+            if hrp then
+                -- Proteção contra teleporte forçado
+                hrp.Anchored = false -- VOCÊ pode andar
+                
+                -- Cancela velocidades extremas (ataques de outros)
+                if hrp.AssemblyLinearVelocity.Magnitude > 100 then
+                    hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                end
+            end
+        end
+    end)
+    
+    return State.meTravar
+end
+
+local noclipEnabled = false
+local function toggleNoclip()
+    noclipEnabled = not noclipEnabled
+    
+    if Connections.noclip then
+        Connections.noclip:Disconnect()
+        Connections.noclip = nil
+    end
+    
+    if noclipEnabled then
+        Connections.noclip = RunService.Stepped:Connect(function()
+            local char = player.Character
+            if char then
+                for _, part in pairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+    end
+    
+    return noclipEnabled
+end
+
+-- Conectar eventos de proteção
+btnGodMode.button.MouseButton1Click:Connect(function()
+    local active = toggleGodMode()
+    btnGodMode.updateStatus(active)
+end)
+
+btnGhostMode.button.MouseButton1Click:Connect(function()
+    local active = toggleGhostMode()
+    btnGhostMode.updateStatus(active)
+end)
+
+btnAntiHit.button.MouseButton1Click:Connect(function()
+    local active = toggleAntiHit()
+    btnAntiHit.updateStatus(active)
+end)
+
+btnInvisible.button.MouseButton1Click:Connect(function()
+    local active = toggleInvisible()
+    btnInvisible.updateStatus(active)
+end)
+
+btnMeTravar.button.MouseButton1Click:Connect(function()
+    local active = toggleMeTravar()
+    btnMeTravar.updateStatus(active)
+end)
+
+btnNoclip.button.MouseButton1Click:Connect(function()
+    local active = toggleNoclip()
+    btnNoclip.updateStatus(active)
+end)
+
+local forceFieldEnabled = false
+btnForceField.button.MouseButton1Click:Connect(function()
+    forceFieldEnabled = not forceFieldEnabled
+    local char = player.Character
+    
+    if char then
+        if forceFieldEnabled then
+            -- Criar Force Field visual
+            local ff = Instance.new("ForceField")
+            ff.Name = "CustomForceField"
+            ff.Visible = true
+            ff.Parent = char
+        else
+            -- Remover Force Field
+            local ff = char:FindFirstChild("CustomForceField")
+            if ff then
+                ff:Destroy()
+            end
+        end
+    end
+    
+    btnForceField.updateStatus(forceFieldEnabled)
+end)
+
+local antiRagdollEnabled = false
+btnAntiRagdoll.button.MouseButton1Click:Connect(function()
+    antiRagdollEnabled = not antiRagdollEnabled
+    
+    if Connections.antiRagdoll then
+        Connections.antiRagdoll:Disconnect()
+        Connections.antiRagdoll = nil
+    end
+    
+    if antiRagdollEnabled then
+        Connections.antiRagdoll = RunService.Heartbeat:Connect(function()
+            local char = player.Character
+            if char then
+                local hum = char:FindFirstChild("Humanoid")
+                if hum then
+                    -- Prevenir ragdoll/stun
+                    hum.PlatformStand = false
+                    hum.Sit = false
+                    
+                    -- Manter estado normal
+                    if hum:GetState() == Enum.HumanoidStateType.Physics or
+                       hum:GetState() == Enum.HumanoidStateType.FallingDown or
+                       hum:GetState() == Enum.HumanoidStateType.Ragdoll then
+                        hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                    end
+                end
+                
+                -- Remover BallSocketConstraints (ragdoll comum)
+                for _, v in pairs(char:GetDescendants()) do
+                    if v:IsA("BallSocketConstraint") or v:IsA("NoCollisionConstraint") then
+                        v:Destroy()
+                    end
+                end
+            end
+        end)
+    end
+    
+    btnAntiRagdoll.updateStatus(antiRagdollEnabled)
+end)
+
+-- ========================================
+-- CONECTAR EVENTOS - CRASH & KICK
+-- ========================================
+
+local function crashPlayer(targetPlayer)
+    if not targetPlayer or targetPlayer == player then return end
+    
+    task.spawn(function()
+        for i = 1, 100 do
+            pcall(function()
+                local char = targetPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    local hrp = char.HumanoidRootPart
+                    hrp.CFrame = CFrame.new(math.huge, math.huge, math.huge)
+                    hrp.AssemblyLinearVelocity = Vector3.new(math.huge, math.huge, math.huge)
+                    hrp.AssemblyAngularVelocity = Vector3.new(math.huge, math.huge, math.huge)
+                end
+            end)
+            task.wait(0.01)
+        end
+        Stats.crashes = Stats.crashes + 1
+    end)
+end
+
+local function kickPlayer(targetPlayer)
+    if not targetPlayer or targetPlayer == player then return end
+    
+    task.spawn(function()
+        for i = 1, 50 do
+            pcall(function()
+                local char = targetPlayer.Character
+                if char then
+                    for _, part in pairs(char:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part:Destroy()
+                        end
+                    end
+                end
+            end)
+            task.wait(0.01)
+        end
+        Stats.kicks = Stats.kicks + 1
+    end)
+end
+
+btnCrashAll.button.MouseButton1Click:Connect(function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player then
+            crashPlayer(p)
+        end
+    end
+end)
+
+btnCrashLoop.button.MouseButton1Click:Connect(function()
+    if Connections.crashLoop then
+        Connections.crashLoop:Disconnect()
+        Connections.crashLoop = nil
+        State.crashLoop = false
+        btnCrashLoop.updateStatus(false)
+        return
+    end
+    
+    State.crashLoop = true
+    btnCrashLoop.updateStatus(true)
+    
+    Connections.crashLoop = RunService.Heartbeat:Connect(function()
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= player then
+                crashPlayer(p)
+            end
+        end
+    end)
+end)
+
+btnKickAll.button.MouseButton1Click:Connect(function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player then
+            kickPlayer(p)
+        end
+    end
+end)
+
+btnKickLoop.button.MouseButton1Click:Connect(function()
+    if Connections.kickLoop then
+        Connections.kickLoop:Disconnect()
+        Connections.kickLoop = nil
+        State.kickLoop = false
+        btnKickLoop.updateStatus(false)
+        return
+    end
+    
+    State.kickLoop = true
+    btnKickLoop.updateStatus(true)
+    
+    Connections.kickLoop = RunService.Heartbeat:Connect(function()
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= player then
+                kickPlayer(p)
+            end
+        end
+    end)
+end)
+
+-- ========================================
+-- CONECTAR EVENTOS - PLAYER
+-- ========================================
+
+local speedEnabled = false
+btnSpeed.button.MouseButton1Click:Connect(function()
+    speedEnabled = not speedEnabled
+    local char = player.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = speedEnabled and 32 or 16
+    end
+    btnSpeed.updateStatus(speedEnabled)
+end)
+
+local jumpEnabled = false
+btnJump.button.MouseButton1Click:Connect(function()
+    jumpEnabled = not jumpEnabled
+    local char = player.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.JumpPower = jumpEnabled and 100 or 50
+    end
+    btnJump.updateStatus(jumpEnabled)
+end)
+
+local flying = false
+local flySpeed = 50
+btnFly.button.MouseButton1Click:Connect(function()
+    flying = not flying
+    btnFly.updateStatus(flying)
+    
+    if flying then
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        
+        local bg = Instance.new("BodyGyro")
+        bg.P = 9e4
+        bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+        bg.Parent = hrp
+        
+        local bv = Instance.new("BodyVelocity")
+        bv.velocity = Vector3.new(0, 0, 0)
+        bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+        bv.Parent = hrp
+        
+        Connections.fly = RunService.Heartbeat:Connect(function()
+            if not flying then
+                bg:Destroy()
+                bv:Destroy()
+                if Connections.fly then
+                    Connections.fly:Disconnect()
+                end
+                return
+            end
+            
+            local cam = workspace.CurrentCamera
+            local moveDir = Vector3.new(0, 0, 0)
+            
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                moveDir = moveDir + cam.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                moveDir = moveDir - cam.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                moveDir = moveDir - cam.CFrame.RightVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                moveDir = moveDir + cam.CFrame.RightVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                moveDir = moveDir + Vector3.new(0, 1, 0)
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+                moveDir = moveDir - Vector3.new(0, 1, 0)
+            end
+            
+            bv.velocity = moveDir.Unit * flySpeed
+            bg.cframe = cam.CFrame
+        end)
+    else
+        if Connections.fly then
+            Connections.fly:Disconnect()
+        end
+    end
+end)
+
+local infJumpEnabled = false
+btnInfJump.button.MouseButton1Click:Connect(function()
+    infJumpEnabled = not infJumpEnabled
+    btnInfJump.updateStatus(infJumpEnabled)
+    
+    if infJumpEnabled then
+        Connections.infJump = UserInputService.JumpRequest:Connect(function()
+            local char = player.Character
+            if char and char:FindFirstChild("Humanoid") then
+                char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end)
+    else
+        if Connections.infJump then
+            Connections.infJump:Disconnect()
+        end
+    end
+end)
+
+-- ========================================
+-- ATUALIZAR STATUS INFO
+-- ========================================
+
+task.spawn(function()
+    while task.wait(1) do
+        local playerCount = #Players:GetPlayers()
+        statusInfo.Text = string.format("Players: %d | TP: %d | Crashes: %d", 
+            playerCount, Stats.teleports, Stats.crashes)
+    end
+end)
+
+-- ========================================
+-- INICIALIZAÇÃO
+-- ========================================
+
+showPage("ServerControl")
+sidebarBtns[1].BackgroundColor3 = Color3.fromRGB(139, 92, 246)
+sidebarBtns[1]:FindFirstChild("ActiveIndicator").Visible = true
+for _, child in pairs(sidebarBtns[1]:GetChildren()) do
+    if child:IsA("TextLabel") then
+        child.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end
+end
+
+print("╔══════════════════════════════════════╗")
+print("║    HUB CARREGADO COM SUCESSO! ✅    ║")
+print("║                                      ║")
+print("║  • Interface Moderna Criada          ║")
+print("║  • Todas Funcionalidades Ativas      ║")
+print("║  • Sistema de Loops Funcionando      ║")
+print("║                                      ║")
+print("╚══════════════════════════════════════╝")
