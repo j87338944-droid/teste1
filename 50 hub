@@ -1,1 +1,706 @@
+-- EXECUTOR GUI 3D MODERNA - SEM BUGS
+-- Coloque em: StarterPlayer > StarterPlayerScripts > LocalScript
 
+wait(2) -- Aguardar carregamento completo
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local mouse = player:GetMouse()
+
+-- Obter Character
+local function getCharacter()
+	return player.Character or player.CharacterAdded:Wait()
+end
+
+local character = getCharacter()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- Estados
+local states = {
+	flying = false,
+	noclip = false,
+	invisible = false,
+	godmode = false,
+	infiniteJump = false,
+	esp = false,
+	fullbright = false,
+	spinning = false,
+	clickTp = false,
+	frozen = false
+}
+
+print("🔧 Iniciando GUI...")
+
+-- Criar ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "ExecutorGUI"
+gui.ResetOnSpawn = false
+gui.Parent = playerGui
+
+print("✅ ScreenGui criado")
+
+-- Frame Principal
+local main = Instance.new("Frame")
+main.Name = "Main"
+main.Size = UDim2.new(0, 550, 0, 600)
+main.Position = UDim2.new(0.5, -275, 0.5, -300)
+main.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
+main.Parent = gui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 15)
+mainCorner.Parent = main
+
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(100, 200, 255)
+mainStroke.Thickness = 3
+mainStroke.Transparency = 0.5
+mainStroke.Parent = main
+
+print("✅ Frame principal criado")
+
+-- Header
+local header = Instance.new("Frame")
+header.Name = "Header"
+header.Size = UDim2.new(1, 0, 0, 60)
+header.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+header.BorderSizePixel = 0
+header.Parent = main
+
+local headerCorner = Instance.new("UICorner")
+headerCorner.CornerRadius = UDim.new(0, 15)
+headerCorner.Parent = header
+
+-- Título
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -120, 1, 0)
+title.Position = UDim2.new(0, 20, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "⚡ EXECUTOR PRO V2"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 24
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = header
+
+-- Botão Minimizar
+local minimize = Instance.new("TextButton")
+minimize.Size = UDim2.new(0, 40, 0, 40)
+minimize.Position = UDim2.new(1, -90, 0.5, -20)
+minimize.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
+minimize.Text = "—"
+minimize.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimize.TextSize = 20
+minimize.Font = Enum.Font.GothamBold
+minimize.BorderSizePixel = 0
+minimize.Parent = header
+
+local minCorner = Instance.new("UICorner")
+minCorner.CornerRadius = UDim.new(0, 8)
+minCorner.Parent = minimize
+
+-- Botão Fechar
+local close = Instance.new("TextButton")
+close.Size = UDim2.new(0, 40, 0, 40)
+close.Position = UDim2.new(1, -45, 0.5, -20)
+close.BackgroundColor3 = Color3.fromRGB(255, 70, 70)
+close.Text = "×"
+close.TextColor3 = Color3.fromRGB(255, 255, 255)
+close.TextSize = 28
+close.Font = Enum.Font.GothamBold
+close.BorderSizePixel = 0
+close.Parent = header
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 8)
+closeCorner.Parent = close
+
+print("✅ Header criado")
+
+-- ScrollFrame
+local scroll = Instance.new("ScrollingFrame")
+scroll.Name = "Scroll"
+scroll.Size = UDim2.new(1, -20, 1, -80)
+scroll.Position = UDim2.new(0, 10, 0, 70)
+scroll.BackgroundColor3 = Color3.fromRGB(22, 22, 35)
+scroll.BorderSizePixel = 0
+scroll.ScrollBarThickness = 6
+scroll.ScrollBarImageColor3 = Color3.fromRGB(100, 200, 255)
+scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+scroll.Parent = main
+
+local scrollCorner = Instance.new("UICorner")
+scrollCorner.CornerRadius = UDim.new(0, 10)
+scrollCorner.Parent = scroll
+
+local layout = Instance.new("UIGridLayout")
+layout.CellSize = UDim2.new(0, 160, 0, 70)
+layout.CellPadding = UDim2.new(0, 10, 0, 10)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Parent = scroll
+
+local padding = Instance.new("UIPadding")
+padding.PaddingTop = UDim.new(0, 10)
+padding.PaddingLeft = UDim.new(0, 10)
+padding.PaddingRight = UDim.new(0, 10)
+padding.PaddingBottom = UDim.new(0, 10)
+padding.Parent = scroll
+
+print("✅ ScrollFrame criado")
+
+-- Botão Abrir
+local openBtn = Instance.new("TextButton")
+openBtn.Name = "OpenButton"
+openBtn.Size = UDim2.new(0, 140, 0, 60)
+openBtn.Position = UDim2.new(0, 20, 0.5, -30)
+openBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
+openBtn.Text = "📱 ABRIR"
+openBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+openBtn.TextSize = 18
+openBtn.Font = Enum.Font.GothamBold
+openBtn.BorderSizePixel = 0
+openBtn.Visible = false
+openBtn.Parent = gui
+
+local openCorner = Instance.new("UICorner")
+openCorner.CornerRadius = UDim.new(0, 12)
+openCorner.Parent = openBtn
+
+local openStroke = Instance.new("UIStroke")
+openStroke.Color = Color3.fromRGB(100, 200, 255)
+openStroke.Thickness = 2
+openStroke.Parent = openBtn
+
+print("✅ Botão abrir criado")
+
+-- Função criar botão
+local function createButton(icon, name, description, isToggle, callback)
+	local btn = Instance.new("TextButton")
+	btn.Name = name
+	btn.BackgroundColor3 = Color3.fromRGB(30, 30, 48)
+	btn.BorderSizePixel = 0
+	btn.Text = ""
+	btn.AutoButtonColor = false
+	btn.Parent = scroll
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = btn
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(60, 60, 80)
+	stroke.Thickness = 2
+	stroke.Transparency = 0.5
+	stroke.Parent = btn
+
+	-- Ícone
+	local iconLabel = Instance.new("TextLabel")
+	iconLabel.Size = UDim2.new(0, 35, 0, 35)
+	iconLabel.Position = UDim2.new(0, 8, 0, 5)
+	iconLabel.BackgroundTransparency = 1
+	iconLabel.Text = icon
+	iconLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+	iconLabel.TextSize = 24
+	iconLabel.Font = Enum.Font.GothamBold
+	iconLabel.Parent = btn
+
+	-- Nome
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.new(1, -50, 0, 20)
+	nameLabel.Position = UDim2.new(0, 48, 0, 8)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = name
+	nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	nameLabel.TextSize = 13
+	nameLabel.Font = Enum.Font.GothamBold
+	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	nameLabel.Parent = btn
+
+	-- Descrição
+	local descLabel = Instance.new("TextLabel")
+	descLabel.Size = UDim2.new(1, -50, 0, 15)
+	descLabel.Position = UDim2.new(0, 48, 0, 28)
+	descLabel.BackgroundTransparency = 1
+	descLabel.Text = description
+	descLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
+	descLabel.TextSize = 10
+	descLabel.Font = Enum.Font.Gotham
+	descLabel.TextXAlignment = Enum.TextXAlignment.Left
+	descLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	descLabel.Parent = btn
+
+	-- Indicador
+	local indicator = Instance.new("Frame")
+	indicator.Size = UDim2.new(0, 18, 0, 18)
+	indicator.Position = UDim2.new(1, -25, 0.5, -9)
+	indicator.BackgroundColor3 = Color3.fromRGB(255, 70, 70)
+	indicator.BorderSizePixel = 0
+	indicator.Visible = isToggle
+	indicator.Parent = btn
+
+	local indCorner = Instance.new("UICorner")
+	indCorner.CornerRadius = UDim.new(1, 0)
+	indCorner.Parent = indicator
+
+	local isActive = false
+
+	-- Função de atualização
+	local function update(active)
+		isActive = active
+		local color = active and Color3.fromRGB(80, 255, 120) or Color3.fromRGB(255, 70, 70)
+
+		TweenService:Create(indicator, TweenInfo.new(0.3), {BackgroundColor3 = color}):Play()
+		TweenService:Create(stroke, TweenInfo.new(0.3), {
+			Color = active and Color3.fromRGB(80, 255, 120) or Color3.fromRGB(60, 60, 80),
+			Transparency = active and 0.2 or 0.5
+		}):Play()
+		TweenService:Create(iconLabel, TweenInfo.new(0.3), {
+			TextColor3 = active and Color3.fromRGB(80, 255, 120) or Color3.fromRGB(100, 200, 255)
+		}):Play()
+	end
+
+	-- Click
+	btn.MouseButton1Click:Connect(function()
+		if isToggle then
+			update(not isActive)
+		end
+		callback(isActive)
+	end)
+
+	-- Hover
+	btn.MouseEnter:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}):Play()
+	end)
+
+	btn.MouseLeave:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(30, 30, 48)}):Play()
+	end)
+
+	return btn, update
+end
+
+print("✅ Função createButton pronta")
+
+-- === CRIAR BOTÕES ===
+
+-- 1. VOAR
+createButton("✈️", "Voar", "WASD + Space/Shift", true, function(active)
+	states.flying = active
+	print("Voar:", active)
+end)
+
+-- 2. CONGELAR VISUAL
+createButton("❄️", "Congelar", "Outros veem parado", true, function(active)
+	states.frozen = active
+	print("Congelar:", active)
+end)
+
+-- 3. INVISIBILIDADE
+createButton("👻", "Invisível", "Ficar invisível", true, function(active)
+	states.invisible = active
+	for _, part in pairs(character:GetDescendants()) do
+		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+			part.Transparency = active and 1 or 0
+		elseif part:IsA("Decal") then
+			part.Transparency = active and 1 or 0
+		end
+	end
+	print("Invisível:", active)
+end)
+
+-- 4. NOCLIP
+createButton("🚪", "NoClip", "Atravessar paredes", true, function(active)
+	states.noclip = active
+	print("NoClip:", active)
+end)
+
+-- 5. GOD MODE
+createButton("🛡️", "God Mode", "Imortalidade", true, function(active)
+	states.godmode = active
+	print("God Mode:", active)
+end)
+
+-- 6. INFINITE JUMP
+createButton("🦘", "Jump Infinito", "Pular sem parar", true, function(active)
+	states.infiniteJump = active
+	print("Infinite Jump:", active)
+end)
+
+-- 7. SPEED 50
+createButton("🏃", "Speed 50", "Velocidade rápida", false, function()
+	humanoid.WalkSpeed = 50
+	print("Speed 50")
+end)
+
+-- 8. SPEED 100
+createButton("⚡", "Speed 100", "Muito rápido", false, function()
+	humanoid.WalkSpeed = 100
+	print("Speed 100")
+end)
+
+-- 9. SPEED 200
+createButton("🚀", "Speed 200", "Ultra rápido", false, function()
+	humanoid.WalkSpeed = 200
+	print("Speed 200")
+end)
+
+-- 10. SPEED NORMAL
+createButton("🚶", "Speed Normal", "Velocidade padrão", false, function()
+	humanoid.WalkSpeed = 16
+	print("Speed Normal")
+end)
+
+-- 11. JUMP 100
+createButton("⬆️", "Jump 100", "Pulo alto", false, function()
+	humanoid.JumpPower = 100
+	print("Jump 100")
+end)
+
+-- 12. JUMP 200
+createButton("🔝", "Jump 200", "Pulo muito alto", false, function()
+	humanoid.JumpPower = 200
+	print("Jump 200")
+end)
+
+-- 13. JUMP NORMAL
+createButton("👟", "Jump Normal", "Pulo padrão", false, function()
+	humanoid.JumpPower = 50
+	print("Jump Normal")
+end)
+
+-- 14. ESP
+createButton("👁️", "ESP", "Ver players", true, function(active)
+	states.esp = active
+	print("ESP:", active)
+end)
+
+-- 15. FULLBRIGHT
+createButton("💡", "FullBright", "Iluminação total", true, function(active)
+	states.fullbright = active
+	local lighting = game:GetService("Lighting")
+	lighting.Brightness = active and 3 or 1
+	lighting.Ambient = active and Color3.new(1, 1, 1) or Color3.new(0.5, 0.5, 0.5)
+	print("FullBright:", active)
+end)
+
+-- 16. REMOVE FOG
+createButton("🌫️", "Remove Fog", "Sem neblina", false, function()
+	game:GetService("Lighting").FogEnd = 100000
+	print("Fog removido")
+end)
+
+-- 17. ANTI AFK
+createButton("⏰", "Anti AFK", "Nunca ser kickado", false, function()
+	local vu = game:GetService("VirtualUser")
+	player.Idled:Connect(function()
+		vu:CaptureController()
+		vu:ClickButton2(Vector2.new())
+	end)
+	print("Anti AFK ativado")
+end)
+
+-- 18. GRAVITY BAIXA
+createButton("🌍", "Gravity 50", "Gravidade baixa", false, function()
+	workspace.Gravity = 50
+	print("Gravity 50")
+end)
+
+-- 19. SEM GRAVITY
+createButton("🌌", "Gravity 0", "Sem gravidade", false, function()
+	workspace.Gravity = 0
+	print("Gravity 0")
+end)
+
+-- 20. GRAVITY NORMAL
+createButton("🌎", "Gravity Normal", "Padrão 196", false, function()
+	workspace.Gravity = 196.2
+	print("Gravity Normal")
+end)
+
+-- 21. TP +10 FRENTE
+createButton("📍", "TP +10", "Teleport curto", false, function()
+	rootPart.CFrame = rootPart.CFrame + rootPart.CFrame.LookVector * 10
+	print("TP +10")
+end)
+
+-- 22. TP +50 FRENTE
+createButton("🎯", "TP +50", "Teleport médio", false, function()
+	rootPart.CFrame = rootPart.CFrame + rootPart.CFrame.LookVector * 50
+	print("TP +50")
+end)
+
+-- 23. TP CIMA
+createButton("🚁", "TP Cima", "Teleport +10 up", false, function()
+	rootPart.CFrame = rootPart.CFrame + Vector3.new(0, 10, 0)
+	print("TP Cima")
+end)
+
+-- 24. TP SPAWN
+createButton("🏠", "TP Spawn", "Voltar spawn", false, function()
+	local spawn = workspace:FindFirstChild("SpawnLocation")
+	if spawn then
+		rootPart.CFrame = spawn.CFrame + Vector3.new(0, 5, 0)
+		print("TP Spawn")
+	end
+end)
+
+-- 25. CLICK TP
+createButton("🖱️", "Click TP", "TP com mouse", true, function(active)
+	states.clickTp = active
+	print("Click TP:", active)
+end)
+
+-- 26. SPIN
+createButton("🌀", "Spin", "Girar character", true, function(active)
+	states.spinning = active
+	print("Spin:", active)
+end)
+
+-- 27. PLATAFORMA
+createButton("🟦", "Plataforma", "Criar plataforma", false, function()
+	local platform = Instance.new("Part")
+	platform.Size = Vector3.new(15, 1, 15)
+	platform.Position = rootPart.Position - Vector3.new(0, 4, 0)
+	platform.Anchored = true
+	platform.BrickColor = BrickColor.new("Bright blue")
+	platform.Parent = workspace
+	print("Plataforma criada")
+end)
+
+-- 28. REMOVE HATS
+createButton("🎩", "Remove Hats", "Tirar acessórios", false, function()
+	for _, acc in pairs(character:GetChildren()) do
+		if acc:IsA("Accessory") then
+			acc:Destroy()
+		end
+	end
+	print("Hats removidos")
+end)
+
+-- 29. REMOVE KILLS
+createButton("🔥", "Remove Kills", "Remover kill parts", false, function()
+	for _, part in pairs(workspace:GetDescendants()) do
+		if part:IsA("BasePart") and part.Name:lower():find("kill") then
+			part:Destroy()
+		end
+	end
+	print("Kill parts removidos")
+end)
+
+-- 30. RESET
+createButton("💀", "Reset", "Resetar character", false, function()
+	humanoid.Health = 0
+	print("Reset")
+end)
+
+-- 31. REJOIN
+createButton("🔁", "Rejoin", "Reconectar", false, function()
+	game:GetService("TeleportService"):Teleport(game.PlaceId, player)
+	print("Rejoining...")
+end)
+
+-- 32-42. MAIS OPÇÕES
+createButton("💨", "Speed 500", "Velocidade max", false, function()
+	humanoid.WalkSpeed = 500
+end)
+
+createButton("🌙", "Jump 500", "Pulo extremo", false, function()
+	humanoid.JumpPower = 500
+end)
+
+createButton("🗺️", "Remove Barriers", "Tirar barreiras", false, function()
+	for _, part in pairs(workspace:GetDescendants()) do
+		if part:IsA("BasePart") and part.Name:lower():find("barrier") then
+			part:Destroy()
+		end
+	end
+end)
+
+createButton("🎯", "Big Hitbox", "Hitbox grande", false, function()
+	for _, p in pairs(Players:GetPlayers()) do
+		if p ~= player and p.Character then
+			local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				hrp.Size = Vector3.new(10, 10, 10)
+				hrp.Transparency = 0.8
+			end
+		end
+	end
+end)
+
+createButton("🌈", "Rainbow", "Character colorido", false, function()
+	spawn(function()
+		for i = 1, 100 do
+			for _, part in pairs(character:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.Color = Color3.fromHSV(i / 100, 1, 1)
+				end
+			end
+			wait(0.1)
+		end
+	end)
+end)
+
+createButton("⚡", "Speed 1000", "Mega speed", false, function()
+	humanoid.WalkSpeed = 1000
+end)
+
+createButton("🔆", "Day", "Sempre dia", false, function()
+	game:GetService("Lighting").ClockTime = 12
+end)
+
+createButton("🌙", "Night", "Sempre noite", false, function()
+	game:GetService("Lighting").ClockTime = 0
+end)
+
+createButton("🎮", "Free Cam", "Camera livre", false, function()
+	workspace.CurrentCamera.CameraSubject = nil
+end)
+
+createButton("📷", "Reset Cam", "Camera normal", false, function()
+	workspace.CurrentCamera.CameraSubject = humanoid
+end)
+
+createButton("💪", "Max Health", "Vida máxima", false, function()
+	humanoid.MaxHealth = 999999
+	humanoid.Health = 999999
+end)
+
+createButton("🎪", "Sit", "Sentar", false, function()
+	humanoid.Sit = true
+end)
+
+print("✅ Todos os botões criados!")
+
+-- Atualizar Canvas
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+end)
+scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+
+-- Controles da GUI
+close.MouseButton1Click:Connect(function()
+	gui:Destroy()
+	print("GUI fechada")
+end)
+
+minimize.MouseButton1Click:Connect(function()
+	main.Visible = false
+	openBtn.Visible = true
+	print("GUI minimizada")
+end)
+
+openBtn.MouseButton1Click:Connect(function()
+	main.Visible = true
+	openBtn.Visible = false
+	print("GUI aberta")
+end)
+
+-- Sistema de Voo
+local flyControl = {f = 0, b = 0, l = 0, r = 0, u = 0, d = 0}
+local bg, bv
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+	if states.flying then
+		if input.KeyCode == Enum.KeyCode.W then flyControl.f = 1
+		elseif input.KeyCode == Enum.KeyCode.S then flyControl.b = 1
+		elseif input.KeyCode == Enum.KeyCode.A then flyControl.l = 1
+		elseif input.KeyCode == Enum.KeyCode.D then flyControl.r = 1
+		elseif input.KeyCode == Enum.KeyCode.Space then flyControl.u = 1
+		elseif input.KeyCode == Enum.KeyCode.LeftShift then flyControl.d = 1
+		end
+	end
+	if states.infiniteJump and input.KeyCode == Enum.KeyCode.Space then
+		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+	end
+	if input.KeyCode == Enum.KeyCode.Insert then
+		main.Visible = not main.Visible
+		openBtn.Visible = not main.Visible
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.KeyCode == Enum.KeyCode.W then flyControl.f = 0
+	elseif input.KeyCode == Enum.KeyCode.S then flyControl.b = 0
+	elseif input.KeyCode == Enum.KeyCode.A then flyControl.l = 0
+	elseif input.KeyCode == Enum.KeyCode.D then flyControl.r = 0
+	elseif input.KeyCode == Enum.KeyCode.Space then flyControl.u = 0
+	elseif input.KeyCode == Enum.KeyCode.LeftShift then flyControl.d = 0
+	end
+end)
+
+-- Click TP
+mouse.Button1Down:Connect(function()
+	if states.clickTp and mouse.Target then
+		rootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0))
+	end
+end)
+
+-- Loop Principal
+RunService.Heartbeat:Connect(function()
+	pcall(function()
+		character = player.Character
+		if not character then return end
+		humanoid = character:FindFirstChild("Humanoid")
+		rootPart = character:FindFirstChild("HumanoidRootPart")
+		if not humanoid or not rootPart then return end
+
+		-- Voo
+		if states.flying then
+			if not bg then
+				bg = Instance.new("BodyGyro", rootPart)
+				bg.P = 9e4
+				bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+				bv = Instance.new("BodyVelocity", rootPart)
+				bv.velocity = Vector3.new(0, 0, 0)
+				bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+			end
+
+			local cam = workspace.CurrentCamera
+			local direction = ((cam.CFrame.LookVector * (flyControl.f - flyControl.b)) + 
+				((cam.CFrame * CFrame.new(flyControl.l - flyControl.r, (flyControl.u - flyControl.d), 0).p) - cam.CFrame.p))
+
+			bv.velocity = direction * 75
+			bg.cframe = cam.CFrame
+			humanoid.PlatformStand = true
+		else
+			if bg then bg:Destroy() bg = nil end
+			if bv then bv:Destroy() bv = nil end
+			humanoid.PlatformStand = false
+		end
+
+		-- NoClip
+		if states.noclip then
+			for _, part in pairs(character:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.CanCollide = false
+				end
+			end
+		end
+
+		-- God Mode
+		if states.godmode and humanoid.Health < humanoid.MaxHealth then
+			humanoid.Health = humanoid.MaxHealth
+		end
+
+		-- Spinning
+		if states.spinning then
+			rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, math.rad(20), 0)
+		end
+	end)
+end)
+
+print("✅✅✅ GUI TOTALMENTE CARREGADA!")
+print("📱 Pressione INSERT para abrir/fechar")
+print("✈️ Use WASD + Space/Shift para voar") faz a interface 3d e moderna e add mais 50 opcoes 
